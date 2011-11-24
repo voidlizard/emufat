@@ -43,8 +43,8 @@ encodeMain args@(img, blSz, blNum) = do
         blk h v@(Just (REQ i0 c)) i = do
           bk <- read i h
           if c == bk
-            then dump v >> (return $ Just $ RANGE i0 i c)
-            else return $ Just $ (REQ i bk)
+            then return $ Just $ RANGE i0 i c
+            else dump v >> (return $ Just (REQ i bk))
 
         blk h v@(Just (RANGE i01 i02 c)) i = do
           bk <- read i h
@@ -52,7 +52,8 @@ encodeMain args@(img, blSz, blNum) = do
             then return $ Just $ RANGE i01 i c
             else dump v >> (return $ Just $ REQ i bk)
 
-        dump (Just v) = liftIO $ print v
+        dump (Just (REQ  i c)) = liftIO $ putStrLn (printf "EQ %d  " i) >> mapM_ print c >> putStrLn ";"
+        dump (Just (RANGE i0 i1 c)) = liftIO $ putStrLn (printf "RANGE %d %d : " i0 i1) >> mapM_ print c >> putStrLn "; "
         dump Nothing  = return ()
 
         read i h = do
