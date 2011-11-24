@@ -6,10 +6,18 @@ import System.IO (withFile, IOMode(..))
 import Text.Printf
 import Data.Word (Word8)
 import Data.List
+import Data.Maybe
 import Control.Monad
+import Control.Monad.State
+import Control.Monad.Writer
+import qualified Data.Map as M
+import qualified Data.Set as S
+import Data.Digest.SHA1 (hash)
+import qualified Data.Digest.SHA1 as SHA1
+
 
 data EncBlock = EncBlock [Chunk] deriving Show
-data Chunk = SEQ BS.ByteString | RLE Int Word8 deriving Show
+data Chunk = SEQ BS.ByteString | RLE Int Word8 | BLOCK Int deriving Show
 
 hexDump :: Int -> BS.ByteString -> [String]
 hexDump n s = map (intercalate " " . map hex) (eat [] bytes)
@@ -24,16 +32,25 @@ encodeMain :: (String, Int, Int) -> IO ()
 encodeMain args@(img, blSz, blNum) = do
   putStrLn $ "encoding" ++ show args
   withFile img ReadMode $ \h -> do
-    forM_ [1..blNum] $ \i -> do
-      block <- BS.hGet h blSz
-      let encoded = encodeBlock block
-      putStrLn (printf "BLOCK %d" (i-1))
-      mapM_ print encoded
-      putStrLn ""
---      mapM_  putStrLn (hexDump 16 block)
---      putStrLn $ "BLOCK READ " ++ show (i - 1)
+    flip runStateT M.empty $ do
+        forM_ [1..blNum] $ \i -> do
+          block <- liftIO $ BS.hGet h blSz
+          let encoded = encodeBlock block
+          let hsh = block -- SHA1.toInteger $ hash (BS.unpack block)
+          exists <- gets (M.member hsh)
+          if exists
+            then gets (fromJust . M.lookup hsh) >>= \n -> out i [BLOCK n]
+            else out i encoded >> modify (M.insert hsh i)
+          return ()
+  putStrLn "DONE"
+  where out i chunk = liftIO $ do
+        putStrLn (printf "sector %d" i) 
+        mapM_ print chunk
+        putStrLn ""
+--        putStrLn (printf "BLOCK %d" (i-1))
+--        putStrLn ""
 
-encodeBlock :: BS.ByteString -> [Chunk] 
+encodeBlock :: BS.ByteString -> [Chunk]
 encodeBlock bs = eat [] [] groups
   where groups  = group (BS.unpack bs)
         eat :: [Chunk] -> [Word8] -> [[Word8]] -> [Chunk]
