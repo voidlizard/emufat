@@ -16,8 +16,9 @@ import Data.Digest.SHA1 (hash)
 import qualified Data.Digest.SHA1 as SHA1
 
 
-data EncBlock = EncBlock [Chunk] deriving Show
-data Chunk = SEQ BS.ByteString | RLE Int Word8 | BLOCK Int deriving Show
+--data EncBlock = EncBlock [Chunk] deriving Show
+data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
+data Chunk = SEQ BS.ByteString | RLE Int Word8 | BLOCK Int deriving (Eq, Ord, Show)
 
 hexDump :: Int -> BS.ByteString -> [String]
 hexDump n s = map (intercalate " " . map hex) (eat [] bytes)
@@ -33,22 +34,35 @@ encodeMain args@(img, blSz, blNum) = do
   putStrLn $ "encoding" ++ show args
   withFile img ReadMode $ \h -> do
     flip runStateT M.empty $ do
-        forM_ [1..blNum] $ \i -> do
+      foldM (blk h) Nothing [0..blNum-1] >>= dump
+    return ()
+  where blk h Nothing i = do
+          bk <- read i h
+          return $ Just (REQ i bk)
+
+        blk h v@(Just (REQ i0 c)) i = do
+          bk <- read i h
+          if c == bk
+            then dump v >> (return $ Just $ RANGE i0 i c)
+            else return $ Just $ (REQ i bk)
+
+        blk h v@(Just (RANGE i01 i02 c)) i = do
+          bk <- read i h
+          if c == bk
+            then return $ Just $ RANGE i01 i c
+            else dump v >> (return $ Just $ REQ i bk)
+
+        dump (Just v) = liftIO $ print v
+        dump Nothing  = return ()
+
+        read i h = do
           block <- liftIO $ BS.hGet h blSz
           let encoded = encodeBlock block
-          let hsh = block -- SHA1.toInteger $ hash (BS.unpack block)
+          let hsh = block
           exists <- gets (M.member hsh)
           if exists
-            then gets (fromJust . M.lookup hsh) >>= \n -> out i [BLOCK n]
-            else out i encoded >> modify (M.insert hsh i)
-          return ()
-  putStrLn "DONE"
-  where out i chunk = liftIO $ do
-        putStrLn (printf "sector %d" i) 
-        mapM_ print chunk
-        putStrLn ""
---        putStrLn (printf "BLOCK %d" (i-1))
---        putStrLn ""
+            then gets (fromJust . M.lookup hsh) >>= \n -> return [BLOCK n]
+            else modify (M.insert hsh i) >> return encoded
 
 encodeBlock :: BS.ByteString -> [Chunk]
 encodeBlock bs = eat [] [] groups
