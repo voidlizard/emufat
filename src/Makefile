@@ -1,0 +1,2 @@
+all:
+	ghc ./FsEncode.hs

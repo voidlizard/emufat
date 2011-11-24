@@ -9,7 +9,7 @@ import Data.List
 import Control.Monad
 
 data EncBlock = EncBlock [Chunk] deriving Show
-data Chunk = Seq BS.ByteString | RLE Int Word8 deriving Show
+data Chunk = SEQ BS.ByteString | RLE Int Word8 deriving Show
 
 hexDump :: Int -> BS.ByteString -> [String]
 hexDump n s = map (intercalate " " . map hex) (eat [] bytes)
@@ -27,7 +27,9 @@ encodeMain args@(img, blSz, blNum) = do
     forM_ [1..blNum] $ \i -> do
       block <- BS.hGet h blSz
       let encoded = encodeBlock block
+      putStrLn (printf "BLOCK %d" (i-1))
       mapM_ print encoded
+      putStrLn ""
 --      mapM_  putStrLn (hexDump 16 block)
 --      putStrLn $ "BLOCK READ " ++ show (i - 1)
 
@@ -41,7 +43,7 @@ encodeBlock bs = eat [] [] groups
         eat acc seq [] = reverse (packseq seq : acc)
         packRle r [] acc = r : acc
         packRle r seq acc = r : packseq seq : acc
-        packseq seq = Seq (BS.pack (reverse seq))
+        packseq seq = SEQ (BS.pack (reverse seq))
 
 usageMain = do
   putStrLn "Usage: FsEncode fs_image block_size block_num"
