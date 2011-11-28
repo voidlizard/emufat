@@ -14,20 +14,12 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Digest.SHA1 (hash)
 import qualified Data.Digest.SHA1 as SHA1
+import Util
 
 
 --data EncBlock = EncBlock [Chunk] deriving Show
 data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
 data Chunk = SEQ BS.ByteString | RLE Int Word8 | BLOCK Int deriving (Eq, Ord, Show)
-
-hexDump :: Int -> BS.ByteString -> [String]
-hexDump n s = map (intercalate " " . map hex) (eat [] bytes)
-  where bytes = BS.unpack s
-        hex :: Word8 -> String
-        hex = printf "%02X"
-        eat :: [[a]] -> [a] -> [[a]]
-        eat acc s | length s <= n = acc ++ [s]
-                  | otherwise = eat (acc ++ [take n s]) (drop n s)
 
 encodeMain :: (String, Int, Int) -> IO ()
 encodeMain args@(img, blSz, blNum) = do
