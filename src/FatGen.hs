@@ -11,6 +11,7 @@ import Data.Word (Word8, Word32, Word16)
 import Data.Bits
 import Data.Char
 import Data.List
+import Data.Maybe
 import qualified Data.Set as S
 import Control.Monad
 import Control.Monad.Writer
@@ -57,12 +58,6 @@ allocTable fat from len = runPut $ mapM_ putWord32le clusters
 megs = ((*) (1024*1024))
 gigs = ((*) 1024) . megs
 
-fatSample1 :: Entry
-fatSample1 = DirRoot [ File "file1" (megs 100) Nothing ]
-
-fatSample2 :: Entry
-fatSample2 = DirRoot [ dir "one" [File "file2" (megs 50) Nothing], File "file1" (megs 100) Nothing]
-
 fatDirLenB :: [Entry] -> Int
 fatDirLenB = sum . map eLen
   where eLen (DirRoot _) = 0
@@ -95,7 +90,7 @@ type FATWriterM = FATWriterT []
 
 runFATWriter f init = runWriterT (runStateT (runF f) init)
 
-putEntry :: Entry -> FATWriterM () 
+putEntry :: Entry -> FATWriterM ()
 
 putEntry (DirRoot es) = mapM_ putEntry es
 
@@ -115,19 +110,23 @@ entryRecordShort :: String -> Int -> Int -> Maybe CalendarTime -> [ATTR] -> BS.B
 entryRecordShort nm size clust clk a = runPut $ do
   putNameASCII nm -- Name
   putWord8 (fatAttrB a) -- Attr
-  putWord8 0    -- NTRes
-  putWord8 0    -- CrtTimeTenth
-  putWord16le 0 -- CrtTime
-  putWord16le 0 -- CrtDate
-  putWord16le 0 -- LstAccDate
+  putWord8 0     -- NTRes
+  putWord8 0     -- CrtTimeTenth
+  putWord16le cT -- CrtTime
+  putWord16le cD -- CrtDate
+  putWord16le cD  -- LstAccDate
   putWord16le cHi -- FstClusHI
-  putWord16le 0 -- WrtTime
-  putWord16le 0 -- WrdDate
+  putWord16le cT -- WrtTime
+  putWord16le cD -- WrdDate
   putWord16le cLo -- FstClusLO
   putWord32le (fromIntegral size) -- FileSize
   where cHi :: Word16
         cHi = fromIntegral $ (fromIntegral clust :: Word32) `shiftR` 16 .&. 0xFFFF
         cLo = (fromIntegral clust :: Word16)
+        cT | isNothing clk =  0
+           | otherwise = fatTime (fromJust clk)
+        cD | isNothing clk = 0
+           | otherwise = fatDate (fromJust clk)
 
 putNameASCII :: String -> Put
 putNameASCII s = mapM_ putWord8 bytes
@@ -155,7 +154,13 @@ fatEncode cl r@(DirRoot es) = para item r
         item (Dir nm es) n = trace ("d " ++ nm) $ sum n
         item (File nm _ _) n = trace ("f " ++ nm) $ sum n
 
-fatEncode _ _ = error "fatEncode: only root dir accepted"
+fatEncode _ _ = error "fatEncode: only root dir allowed"
+
+fatSample1 :: Entry
+fatSample1 = DirRoot [ File "file1" (megs 100) Nothing ]
+
+fatSample2 :: Entry
+fatSample2 = DirRoot [ dir "one" [File "file2" (megs 50) Nothing], File "file1" (megs 100) Nothing]
 
 main = do
   putStrLn "PREVED"
@@ -163,7 +168,7 @@ main = do
   print (fatDirLenB (entries fatSample2))
   let es = fatDataEntries CL_32K fatSample2
   print (fatMaxFileLen es)
-
+--  print (universe fatSample2)
   let !n = fatEncode CL_512 fatSample2
   putStrLn "DONE"
 
