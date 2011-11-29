@@ -5,8 +5,10 @@ module Main where
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as BS8 
 import System.Environment ( getArgs )
+import System.Time
 import Text.Printf
-import Data.Word (Word8, Word32)
+import Data.Word (Word8, Word32, Word16)
+import Data.Bits
 import Data.Char
 import Data.List
 import qualified Data.Set as S
@@ -83,7 +85,7 @@ fatDataEntries cl e = [entry x | x <- universe e]
 fatMaxFileLen :: [(Entry, Int)] -> Int
 fatMaxFileLen es = S.findMax $ S.fromList $ map snd es
 
-type FATWriterState = Int
+data FATWriterState = FATWriterState { nextClust :: Int }
 
 newtype FATWriterT m a = FATWriterM {
     runF :: (StateT FATWriterState (WriterT [Rule] m)) a
@@ -97,27 +99,35 @@ putEntry :: Entry -> FATWriterM ()
 
 putEntry (DirRoot es) = mapM_ putEntry es
 
-putEntry (Dir nm es) = do
-  let bytes = runPut $ do
-      putNameASCII nm -- Name
-      putWord8 (fatAttrB [DIR]) -- Attr
-      putWord8 0    -- NTRes
-      putWord8 0    -- CrtTimeTenth
-      putWord16le 0 -- CrtTime
-      putWord16le 0 -- CrtDate
-      putWord16le 0 -- LstAccDate
-      putWord16le 0 -- FstClusHI
-      putWord16le 0 -- WrtTime
-      putWord16le 0 -- WrdDate
-      putWord16le 0 -- FstClusLO
-      putWord32le 0 -- FileSize
+putEntry (Dir nm _) = do
+  let bytes = entryRecordShort nm 0 0 Nothing [DIR]
   return ()
 
 putEntry (DirDot) = undefined
 
 putEntry (DirDotDot) = undefined
 
-putEntry (File nm sz _) = undefined
+putEntry (File nm sz _) = do
+  let bytes = entryRecordShort nm sz 0 Nothing []
+  return ()
+
+entryRecordShort :: String -> Int -> Int -> Maybe CalendarTime -> [ATTR] -> BS.ByteString
+entryRecordShort nm size clust clk a = runPut $ do
+  putNameASCII nm -- Name
+  putWord8 (fatAttrB a) -- Attr
+  putWord8 0    -- NTRes
+  putWord8 0    -- CrtTimeTenth
+  putWord16le 0 -- CrtTime
+  putWord16le 0 -- CrtDate
+  putWord16le 0 -- LstAccDate
+  putWord16le cHi -- FstClusHI
+  putWord16le 0 -- WrtTime
+  putWord16le 0 -- WrdDate
+  putWord16le cLo -- FstClusLO
+  putWord32le (fromIntegral size) -- FileSize
+  where cHi :: Word16
+        cHi = fromIntegral $ (fromIntegral clust :: Word32) `shiftR` 16 .&. 0xFFFF
+        cLo = (fromIntegral clust :: Word16)
 
 putNameASCII :: String -> Put
 putNameASCII s = mapM_ putWord8 bytes
