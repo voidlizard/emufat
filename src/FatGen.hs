@@ -26,7 +26,7 @@ allocTable fat from len = runPut $ mapM_ putWord32le clusters
 main = do
   fn <- liftM (!! 0) getArgs
   fat <- readFAT fn
-  let tbl = allocTable fat 2 (100 * 1024 * 1024)
+  let tbl = allocTable fat 3 (100 * 1024 * 1024)
   BS.hPut stdout tbl
 --  print (tbl)
 --  mapM_ putStrLn (hexDump 32 tbl)
