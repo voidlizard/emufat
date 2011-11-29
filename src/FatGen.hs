@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving  #-}
+{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 
 module Main where
 
@@ -109,7 +109,9 @@ putEntry (DirDotDot) = undefined
 putEntry (File nm sz _) = undefined
 
 putNameASCII :: String -> Put
-putNameASCII s = undefined 
+putNameASCII s = mapM_ putWord8 bytes
+  where bytes :: [Word8]
+        bytes = map (fromIntegral . ord) (validFATNameASCII s)
 
 badChars :: [Int]
 badChars = [0x22, 0x2A, 0x2C, 0x2F ] ++ [0x3A .. 0x3F] ++ [0x5B .. 0x5D]
