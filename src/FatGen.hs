@@ -3,9 +3,11 @@
 module Main where
 
 import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy.Char8 as BS8 
 import System.Environment ( getArgs )
 import Text.Printf
 import Data.Word (Word8, Word32)
+import Data.Char
 import Data.List
 import qualified Data.Set as S
 import Control.Monad
@@ -93,15 +95,32 @@ runFATWriter f init = runWriterT (runStateT (runF f) init)
 
 putEntry :: Entry -> FATWriterM () 
 
-putEntry (DirRoot es) = undefined
+putEntry (DirRoot es) = mapM_ putEntry es
 
-putEntry (Dir nm es) = undefined
+putEntry (Dir nm es) = do
+  let bytes = runPut $ do
+      putNameASCII nm
+  return ()
 
 putEntry (DirDot) = undefined
 
 putEntry (DirDotDot) = undefined
 
 putEntry (File nm sz _) = undefined
+
+putNameASCII :: String -> Put
+putNameASCII s = undefined 
+
+badChars :: [Int]
+badChars = [0x22, 0x2A, 0x2C, 0x2F ] ++ [0x3A .. 0x3F] ++ [0x5B .. 0x5D]
+
+validFATNameASCII :: String -> String
+validFATNameASCII s = take 11 $ reverse $ compl 11 $ foldl' chr "" s 
+  where chr acc c   | ord c < 0x20 || ord c `elem` badChars = '_' : acc
+        chr acc _   | length acc == 11 = acc
+        chr acc '.' = compl 8 acc
+        chr acc c  = c : acc
+        compl n s = replicate (n - length s) ' ' ++ s
 
 type WTF = Int
 

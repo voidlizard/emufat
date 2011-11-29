@@ -54,17 +54,6 @@ encodeMain args@(img, blSz, blNum) = do
             then gets (fromJust . M.lookup hsh) >>= \n -> return [BLOCK n]
             else modify (M.insert hsh i) >> return encoded
 
-encodeBlock :: BS.ByteString -> [Chunk]
-encodeBlock bs = eat [] [] groups
-  where groups  = group (BS.unpack bs)
-        eat :: [Chunk] -> [Word8] -> [[Word8]] -> [Chunk]
-        eat acc seq (x:xs) | length x == 1 = eat acc (head x:seq) xs
-                           | length x >  1 = eat (packRle (RLE (length x) (head x)) seq acc) [] xs
-        eat acc [] [] = reverse acc
-        eat acc seq [] = reverse (packseq seq : acc)
-        packRle r [] acc = r : acc
-        packRle r seq acc = r : packseq seq : acc
-        packseq seq = SEQ (BS.pack (reverse seq))
 
 usageMain = do
   putStrLn "Usage: FsEncode fs_image block_size block_num"
