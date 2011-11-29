@@ -99,7 +99,18 @@ putEntry (DirRoot es) = mapM_ putEntry es
 
 putEntry (Dir nm es) = do
   let bytes = runPut $ do
-      putNameASCII nm
+      putNameASCII nm -- Name
+      putWord8 (fatAttrB [DIR]) -- Attr
+      putWord8 0    -- NTRes
+      putWord8 0    -- CrtTimeTenth
+      putWord16le 0 -- CrtTime
+      putWord16le 0 -- CrtDate
+      putWord16le 0 -- LstAccDate
+      putWord16le 0 -- FstClusHI
+      putWord16le 0 -- WrtTime
+      putWord16le 0 -- WrdDate
+      putWord16le 0 -- FstClusLO
+      putWord32le 0 -- FileSize
   return ()
 
 putEntry (DirDot) = undefined
