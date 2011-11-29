@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable  #-}
+{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving  #-}
 
 module Main where
 
@@ -9,7 +9,9 @@ import Data.Word (Word8, Word32)
 import Data.List
 import qualified Data.Set as S
 import Control.Monad
-import Data.Binary.Put
+import Control.Monad.Writer
+import Control.Monad.Reader
+import Control.Monad.State
 
 import Debug.Trace
 import System.IO
@@ -18,9 +20,11 @@ import Data.Either
 import Data.Data
 import Data.Typeable
 import Data.Generics.Uniplate.Data
+import Data.Binary.Put
 
 import FAT
 import ReadFAT
+import Encode
 import Util
 
 data Entry =  DirRoot [Entry]
@@ -53,7 +57,7 @@ fatSample1 :: Entry
 fatSample1 = DirRoot [ File "file1" (megs 100) Nothing ]
 
 fatSample2 :: Entry
-fatSample2 = DirRoot [ dir "one" [], File "file1" (megs 100) Nothing]
+fatSample2 = DirRoot [ dir "one" [File "file2" (megs 50) Nothing], File "file1" (megs 100) Nothing]
 
 fatDirLenB :: [Entry] -> Int
 fatDirLenB = sum . map eLen
@@ -77,12 +81,49 @@ fatDataEntries cl e = [entry x | x <- universe e]
 fatMaxFileLen :: [(Entry, Int)] -> Int
 fatMaxFileLen es = S.findMax $ S.fromList $ map snd es
 
+type FATWriterState = Int
+
+newtype FATWriterT m a = FATWriterM {
+    runF :: (StateT FATWriterState (WriterT [Rule] m)) a
+} deriving (Monad, MonadWriter [Rule])
+
+type FATWriterM = FATWriterT []
+
+runFATWriter f init = runWriterT (runStateT (runF f) init)
+
+putEntry :: Entry -> FATWriterM () 
+
+putEntry (DirRoot es) = undefined
+
+putEntry (Dir nm es) = undefined
+
+putEntry (DirDot) = undefined
+
+putEntry (DirDotDot) = undefined
+
+putEntry (File nm sz _) = undefined
+
+type WTF = Int
+
+fatEncode :: ClustSize32 -> Entry -> WTF
+fatEncode cl r@(DirRoot es) = para item r
+  where item (DirRoot es) n = trace "Root entry" $ sum n
+        item (DirDot) n = trace "d ." $ sum n
+        item (DirDotDot) n = trace "d .." $ sum n
+        item (Dir nm es) n = trace ("d " ++ nm) $ sum n
+        item (File nm _ _) n = trace ("f " ++ nm) $ sum n
+
+fatEncode _ _ = error "fatEncode: only root dir accepted"
+
 main = do
   putStrLn "PREVED"
   print (fatDirLenB (entries fatSample1))
   print (fatDirLenB (entries fatSample2))
-  let es = fatDataEntries CL_32K fatSample2 
+  let es = fatDataEntries CL_32K fatSample2
   print (fatMaxFileLen es)
+
+  let !n = fatEncode CL_512 fatSample2
+  putStrLn "DONE"
 
 --  fn <- liftM (!! 0) getArgs
 --  fat <- readFAT fn

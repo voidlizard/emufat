@@ -3,7 +3,7 @@ module FAT where
 import Data.Word (Word32)
 
 data ClustSize32 = CL_512 | CL_4K | CL_8K | CL_16K | CL_32K
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 data FAT = FAT32 { bytesPerSect :: Int 
                  , sectPerClust :: Int
