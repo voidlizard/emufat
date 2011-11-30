@@ -13,6 +13,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.Reader
@@ -88,15 +89,13 @@ entryLen cl e@(File n sz _) = fatSizeToClust cl sz
 fatMaxFileLen :: [(Entry, Int)] -> Int
 fatMaxFileLen es = S.findMax $ S.fromList $ map snd es
 
-data FATWriterState = FATWriterState { nextClust :: Int }
+--newtype FATWriterT m a = FATWriterT {
+--    runF :: (WriterT [Rule] m) a
+--} deriving (Monad, MonadWriter [Rule])
 
-data FATWriterOpt = FATWriterOpt { clustSize :: ClustSize32 }
+type FATWriterM = Writer [Rule] -- FATWriterT []
 
-newtype FATWriterT m a = FATWriterM {
-    runF :: (ReaderT FATWriterOpt (StateT FATWriterState (WriterT [Rule] m))) a
-} deriving (Monad, MonadState FATWriterState, MonadWriter [Rule], MonadReader FATWriterOpt)
-
-type FATWriterM = FATWriterT []
+runFATWriter f = snd $ runWriter f
 
 data AllocEntry = AllocEntry { beginSect :: Int
                              , endSect   :: Int
@@ -119,34 +118,25 @@ allocate cl from = eAlloc . eOrder . filter eFilt . universe
               allocated = AllocEntry begin end e
           in (n', allocated : xs)
 
-runFATWriter opts init f = runWriterT (runStateT (runReaderT opts (runF f)) init)
 
-putEntry :: Entry -> FATWriterM ()
+allocateMap :: [AllocEntry] -> M.Map Entry Int
+allocateMap = M.fromList . map (\x -> (entry x, beginSect x))
 
-putEntry (DirRoot es) = error "oops"
+writeEntry :: Maybe CalendarTime -> Int -> Entry -> BS.ByteString 
 
-putEntry (Dir nm _) = do
-  putEncoded $ entryRecordShort nm 0 0 Nothing [DIR]
+writeEntry _ clust (DirRoot es) = error "oops"
 
-putEntry (DirDot) = do
-  putEncoded $ entryRecordShort "." 0 0 Nothing [DIR]
+writeEntry ct clust (Dir nm _) = do
+  entryRecordShort nm 0 clust ct [DIR]
 
-putEntry (DirDotDot) = do
-  putEncoded $ entryRecordShort ".." 0 0 Nothing [DIR]
+writeEntry ct clust (DirDot) = do
+  entryRecordShort "." 0 clust ct [DIR]
 
-putEntry (File nm sz _) = do
-  putEncoded $ entryRecordShort nm sz 0 Nothing []
+writeEntry ct clust (DirDotDot) = do
+  entryRecordShort ".." 0 clust ct [DIR]
 
-putEncoded :: BS.ByteString -> FATWriterM ()
-putEncoded bs = do undefined
---  cl    <- liftM (clustSize) ask
---  clust <- gets nextClust
---  let rule = if sectors == 1
---               then REQ   (ss cl clust)
---               else RANGE (ss cl clust) (ss cl clust + sectors)
---  tell $ [rule (encodeBlock bs)]
---  where sectors = fatSizeToSect cl (BS.length bs)
---        ss cl n =  n * fatSectNum cl
+writeEntry ct clust (File nm sz _) = do
+  entryRecordShort nm sz clust ct []
 
 entryRecordShort :: String -> Int -> Int -> Maybe CalendarTime -> [ATTR] -> BS.ByteString
 entryRecordShort nm size clust clk a = runPut $ do
@@ -179,27 +169,18 @@ badChars :: [Int]
 badChars = [0x22, 0x2A, 0x2C, 0x2F ] ++ [0x3A .. 0x3F] ++ [0x5B .. 0x5D]
 
 validFATNameASCII :: String -> String
-validFATNameASCII s = take 11 $ reverse $ compl 11 $ foldl' chr "" s 
+
+validFATNameASCII s | s == "."  = reverse $ compl 11 s
+                    | s == ".." = reverse $ compl 11 s
+
+validFATNameASCII s = up $ take 11 $ reverse $ compl 11 $ foldl' chr "" s
   where chr acc c   | ord c < 0x20 || ord c `elem` badChars = '_' : acc
         chr acc _   | length acc == 11 = acc
         chr acc '.' = compl 8 acc
         chr acc c  = c : acc
-        compl n s = replicate (n - length s) ' ' ++ s
+        up = map toUpper
 
-type WTF = Int
-
-fatEncode :: ClustSize32 -> Entry -> WTF
-fatEncode cl r@(DirRoot es) = 
-  trace (show es) $ 0
-  where es = universe r
---para item r
---  where item (DirRoot es) n = trace "Put entries: root" $ sum n
---        item (DirDot) n = trace "dot -- skip" $ sum n
---        item (DirDotDot) n = trace "dotdot -- skip" $ sum n
---        item (Dir nm es) n = trace ("dir " ++ nm ++ " put entries") $ sum n
---        item (File nm _ _) n = trace ("file " ++ nm ++ " put content") $ sum n
-
-fatEncode _ _ = error "fatEncode: only root dir allowed"
+compl n s = replicate (n - length s) ' ' ++ s
 
 fatSample1 :: Entry
 fatSample1 = DirRoot [ File "file1" (megs 100) Nothing ]
@@ -207,8 +188,26 @@ fatSample1 = DirRoot [ File "file1" (megs 100) Nothing ]
 fatSample2 :: Entry
 fatSample2 = DirRoot [ dir "one" [File "file2" (megs 50) Nothing], File "file1" (megs 100) Nothing]
 
+fatSample3 :: Entry
+fatSample3 = DirRoot [ dir "one" [], dir "two" [ dir "four" [] ], dir "three" [ dir "five" [] ]]
+
+generate :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
+generate ct cl es = runFATWriter $ do
+  forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) ->
+    case e of
+      DirRoot es  -> writeEntries bsect esect es
+      Dir _ es    -> writeEntries bsect esect es
+      File _ _ sz -> tell [RANGE bsect esect [RLE fatSectLen 0xFF]]
+  where writeEntries bsect esect =
+          encode bsect esect . BS.concat . map (writeEntry ct (clustOf bsect))
+        clustOf n = n `mod` fatSectPerClust cl
+        encode b e bs | b == e    = tell [REQ b (encodeBlock bs ++ rest b e (fromIntegral $ BS.length bs))]
+                      | otherwise = tell [RANGE b e (encodeBlock bs ++ rest b e (fromIntegral $ BS.length bs))]
+        rest a b l = 
+          let rs = (b - a + 1) * fatSectLen - l
+          in if rs > 0 then [RLE rs 0x00] else []
+
 main = do
-  putStrLn "PREVED"
 --  let !q = fatEncode CL_512 (fatSample2)
 --  print (fatDirLenB (entries fatSample1))
 --  print (fatDirLenB (entries fatSample2))
@@ -217,8 +216,17 @@ main = do
 --  print (fatMaxFileLen es)
 --  print (universe fatSample2)
 --  let !n = fatEncode CL_512 fatSample2
-  let alloc = allocate CL_512 0 fatSample2
-  mapM_ print alloc
+  let alloc = allocate CL_512 0 fatSample3
+--  mapM_ print alloc
+  ct <- getClockTime >>= toCalendarTime
+  let !gen = generate (Just ct) CL_512 alloc
+  mapM_ print gen
+  putStrLn ""
+  
+  let bs = decodeBlock $ concatMap chunks gen
+
+  mapM_ putStrLn (hexDump 16 bs) 
+
   putStrLn "DONE"
 
 --  fn <- liftM (!! 0) getArgs

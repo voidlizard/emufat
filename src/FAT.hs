@@ -32,6 +32,8 @@ fatSizeToSect = fatClusters
 fatSizeToClust :: Integral a => ClustSize32 -> a -> a
 fatSizeToClust cl n = (fromIntegral (fromEnum cl)) * (fromIntegral $ fatClusters cl n)
 
+fatSectPerClust cl = (fromEnum cl) `div` (fatSectLen)
+
 fatAttrB :: [ATTR] -> Word8
 fatAttrB as = foldl' f  0 as
   where f acc x = acc .|. (fromIntegral . fromEnum) x

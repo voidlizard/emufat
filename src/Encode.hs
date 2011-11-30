@@ -2,6 +2,8 @@ module Encode where
 
 import Data.Word (Word8)
 import qualified Data.ByteString.Lazy as BS
+import Control.Monad.Writer
+import Data.Binary.Put
 import Data.List
 
 data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
@@ -18,4 +20,14 @@ encodeBlock bs = eat [] [] groups
         packRle r [] acc = r : acc
         packRle r seq acc = r : packseq seq : acc
         packseq seq = SEQ (BS.pack (reverse seq))
+
+decodeBlock :: [Chunk] -> BS.ByteString
+decodeBlock cs = runPut $ mapM_ chunk cs
+  where chunk (SEQ bs)  = putLazyByteString bs
+        chunk (RLE n w) = replicateM_ n (putWord8 w)
+        chunk _ = undefined
+
+chunks :: Rule -> [Chunk]
+chunks (REQ _ c) = c
+chunks (RANGE _ _ c) = c
 
