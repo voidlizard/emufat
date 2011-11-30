@@ -27,6 +27,8 @@ fatLastCluster32 = 0xFFFFFFFF
 fatClusters :: Integral a => ClustSize32 -> a -> a
 fatClusters cl n = ceiling (fromIntegral n / ((fromIntegral . fromEnum) cl))
 
+fatSizeToSect = fatClusters
+
 fatSizeToClust :: Integral a => ClustSize32 -> a -> a
 fatSizeToClust cl n = (fromIntegral (fromEnum cl)) * (fromIntegral $ fatClusters cl n)
 
@@ -45,6 +47,11 @@ fatTime ct = s .|. m .|. h
   where s = w16 (ctSec ct `div` 2) .&. 0x1F
         m = (w16 (ctMin ct) .&. 0x3F) `shiftL` 5
         h = (w16 (ctHour ct) .&. 0x1F) `shiftL` 11
+
+fatSectLen = 512
+
+fatSectNum :: ClustSize32 -> Int
+fatSectNum cl = fromEnum cl `div` fatSectLen 
 
 w16 :: Integral a => a -> Word16
 w16 = fromIntegral
@@ -74,4 +81,6 @@ instance Enum ATTR where
   toEnum 0x08 = VOL_ID
   toEnum 0x10 = DIR   
   toEnum 0x20 = ARCH
+
+
 
