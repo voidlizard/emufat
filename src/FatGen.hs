@@ -271,10 +271,10 @@ main = do
   let alloc = allocate CL_512 0 sample 
   mapM_ print alloc
 
---  ct <- getClockTime >>= toCalendarTime
---  let !gen = generate (Just ct) CL_512 alloc
---  mapM_ print gen
---  putStrLn ""
+  ct <- getClockTime >>= toCalendarTime
+  let !gen = generate (Just ct) CL_512 alloc
+  mapM_ print gen
+  putStrLn ""
 --  let bs = decodeBlock $ concatMap chunks gen
 --  BS.hPut stdout bs
 
