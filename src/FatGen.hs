@@ -33,23 +33,23 @@ import ReadFAT
 import Encode
 import Util
 
-data Entry =  DirRoot [Entry]
-            | DirDot 
-            | DirDotDot
-            | Dir String [Entry]
-            | File String Int (Maybe Int)
+data Entry =  DirRoot    Int [Entry]
+            | DirDot     Int (Maybe Int)
+            | DirDotDot  Int (Maybe Int)
+            | Dir Int String [Entry]
+            | File Int String Int (Maybe Int)
   deriving (Eq, Ord, Data, Typeable, Show)
 
 entries :: Entry -> [Entry]
-entries (DirRoot es) = es
-entries (Dir _ es) = es
+entries (DirRoot _ es) = es
+entries (Dir _ _ es) = es
 entries _ = []
 
 dir :: String -> [Entry] -> Entry
-dir nm es = Dir nm $ [DirDot, DirDotDot] ++ es
+dir nm es = Dir 0 nm $ [DirDot 0 Nothing, DirDotDot 0 Nothing] ++ es
 
 isFile :: Entry -> Bool
-isFile (File _ _ _) = True
+isFile (File _ _ _ _) = True
 isFile _ = False
 
 allocTable :: FAT -> Int -> Int -> BS.ByteString 
@@ -65,26 +65,24 @@ gigs = ((*) 1024) . megs
 
 fatDirLenB :: [Entry] -> Int
 fatDirLenB = sum . map eLen
-  where eLen (DirRoot _) = 0
-        eLen (DirDot)    = 32
-        eLen (DirDotDot) = 32
-        eLen (Dir nm es) | length nm < 12 = 32
+  where eLen (DirRoot _ _) = 0
+        eLen (DirDot _ _)  = 32
+        eLen (DirDotDot _ _) = 32
+        eLen (Dir _ nm es) | length nm < 12 = 32
                          | otherwise = error "Long names are unsupported yet"
-        eLen (File nm _ _) | length nm < 12 = 32
+        eLen (File _ nm _ _) | length nm < 12 = 32
                            | otherwise = error "Long names are unsupported yet"
-
-
 
 fatDataEntries :: ClustSize32 -> Entry -> [(Entry, Int)]
 fatDataEntries cl e = [entry x | x <- universe e]
   where entry e  = (e, entryLen cl e)
 
 entryLen :: ClustSize32 -> Entry -> Int        
-entryLen cl e@(DirRoot es)  = fatSizeToClust cl $ fatDirLenB es
-entryLen cl e@(DirDot)      = 0
-entryLen cl e@(DirDotDot)   = 0
-entryLen cl e@(Dir n es)    = fatSizeToClust cl $ fatDirLenB es
-entryLen cl e@(File n sz _) = fatSizeToClust cl sz
+entryLen cl e@(DirRoot _ es)  = fatSizeToClust cl $ fatDirLenB es
+entryLen cl e@(DirDot _ _)    = 0
+entryLen cl e@(DirDotDot _ _) = 0
+entryLen cl e@(Dir _ n es)    = fatSizeToClust cl $ fatDirLenB es
+entryLen cl e@(File _ n sz _) = fatSizeToClust cl sz
 
 fatMaxFileLen :: [(Entry, Int)] -> Int
 fatMaxFileLen es = S.findMax $ S.fromList $ map snd es
@@ -103,10 +101,10 @@ data AllocEntry = AllocEntry { beginSect :: Int
                              } deriving (Show)
 
 allocate :: ClustSize32 -> Int -> Entry -> [AllocEntry]
-allocate cl from = eAlloc . eOrder . filter eFilt . universe
-  where eFilt (File _ _ _) = True
-        eFilt (Dir _ _)    = True
-        eFilt (DirRoot _)  = True
+allocate cl from = eFix . eAlloc . eOrder . filter eFilt . universe
+  where eFilt (File _ _ _ _) = True
+        eFilt (Dir _ _ _)    = True
+        eFilt (DirRoot _ _)  = True
         eFilt _            = False
         eOrder = uncurry (++) . partition (not.isFile)
         eAlloc = reverse . snd . foldl' fentry (from, [])
@@ -117,25 +115,25 @@ allocate cl from = eAlloc . eOrder . filter eFilt . universe
               n'    = n + sectors
               allocated = AllocEntry begin end e
           in (n', allocated : xs)
-
+        eFix = id
 
 allocateMap :: [AllocEntry] -> M.Map Entry Int
 allocateMap = M.fromList . map (\x -> (entry x, beginSect x))
 
 writeEntry :: Maybe CalendarTime -> Int -> Entry -> BS.ByteString 
 
-writeEntry _ clust (DirRoot es) = error "oops"
+writeEntry _ clust (DirRoot _ es) = error "oops"
 
-writeEntry ct clust (Dir nm _) = do
+writeEntry ct clust (Dir _ nm _) = do
   entryRecordShort nm 0 clust ct [DIR]
 
-writeEntry ct clust (DirDot) = do
+writeEntry ct clust (DirDot _ q) = do
   entryRecordShort "." 0 clust ct [DIR]
 
-writeEntry ct clust (DirDotDot) = do
+writeEntry ct clust (DirDotDot _ q) = do
   entryRecordShort ".." 0 clust ct [DIR]
 
-writeEntry ct clust (File nm sz _) = do
+writeEntry ct clust (File _ nm sz _) = do
   entryRecordShort nm sz clust ct []
 
 entryRecordShort :: String -> Int -> Int -> Maybe CalendarTime -> [ATTR] -> BS.ByteString
@@ -183,21 +181,21 @@ validFATNameASCII s = up $ take 11 $ reverse $ compl 11 $ foldl' chr "" s
 compl n s = replicate (n - length s) ' ' ++ s
 
 fatSample1 :: Entry
-fatSample1 = DirRoot [ File "file1" (megs 100) Nothing ]
+fatSample1 = DirRoot 0 [ File 0 "file1" (megs 100) Nothing ]
 
 fatSample2 :: Entry
-fatSample2 = DirRoot [ dir "one" [File "file2" (megs 50) Nothing], File "file1" (megs 100) Nothing]
+fatSample2 = DirRoot 0 [ dir "one" [File 0 "file2" (megs 50) Nothing], File 0 "file1" (megs 100) Nothing]
 
 fatSample3 :: Entry
-fatSample3 = DirRoot [ dir "one" [], dir "two" [ dir "four" [] ], dir "three" [ dir "five" [] ]]
+fatSample3 = DirRoot 0 [ dir "one" [], dir "two" [ dir "four" [] ], dir "three" [ dir "five" [] ]]
 
 generate :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
 generate ct cl es = runFATWriter $ do
   forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) ->
     case e of
-      DirRoot es  -> writeEntries bsect esect es
-      Dir _ es    -> writeEntries bsect esect es
-      File _ _ sz -> tell [RANGE bsect esect [RLE fatSectLen 0xFF]]
+      DirRoot _ es  -> writeEntries bsect esect es
+      Dir _ _ es    -> writeEntries bsect esect es
+      File _ _ _ sz -> tell [RANGE bsect esect [RLE fatSectLen 0xFF]]
   where writeEntries bsect esect =
           encode bsect esect . BS.concat . map (writeEntry ct (clustOf bsect))
         clustOf n = n `mod` fatSectPerClust cl
@@ -217,15 +215,15 @@ main = do
 --  print (universe fatSample2)
 --  let !n = fatEncode CL_512 fatSample2
   let alloc = allocate CL_512 0 fatSample3
---  mapM_ print alloc
+  mapM_ print alloc
   ct <- getClockTime >>= toCalendarTime
   let !gen = generate (Just ct) CL_512 alloc
   mapM_ print gen
   putStrLn ""
-  
-  let bs = decodeBlock $ concatMap chunks gen
+--  let bs = decodeBlock $ concatMap chunks gen
+--  BS.hPut stdout bs
 
-  mapM_ putStrLn (hexDump 16 bs) 
+--  mapM_ putStrLn (hexDump 16 bs) 
 
   putStrLn "DONE"
 
