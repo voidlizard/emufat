@@ -34,8 +34,8 @@ import Encode
 import Util
 
 data Entry =  DirRoot    Int [Entry]
-            | DirDot     Int (Maybe Int)
-            | DirDotDot  Int (Maybe Int)
+            | DirDot     (Maybe Int)
+            | DirDotDot  (Maybe Int)
             | Dir Int String [Entry]
             | File Int String Int (Maybe Int)
   deriving (Eq, Ord, Data, Typeable, Show)
@@ -46,7 +46,7 @@ entries (Dir _ _ es) = es
 entries _ = []
 
 dir :: String -> [Entry] -> Entry
-dir nm es = Dir 0 nm $ [DirDot 0 Nothing, DirDotDot 0 Nothing] ++ es
+dir nm es = Dir 0 nm $ [DirDot Nothing, DirDotDot Nothing] ++ es
 
 isFile :: Entry -> Bool
 isFile (File _ _ _ _) = True
@@ -66,8 +66,8 @@ gigs = ((*) 1024) . megs
 fatDirLenB :: [Entry] -> Int
 fatDirLenB = sum . map eLen
   where eLen (DirRoot _ _) = 0
-        eLen (DirDot _ _)  = 32
-        eLen (DirDotDot _ _) = 32
+        eLen (DirDot _)  = 32
+        eLen (DirDotDot _) = 32
         eLen (Dir _ nm es) | length nm < 12 = 32
                          | otherwise = error "Long names are unsupported yet"
         eLen (File _ nm _ _) | length nm < 12 = 32
@@ -79,8 +79,8 @@ fatDataEntries cl e = [entry x | x <- universe e]
 
 entryLen :: ClustSize32 -> Entry -> Int        
 entryLen cl e@(DirRoot _ es)  = fatSizeToClust cl $ fatDirLenB es
-entryLen cl e@(DirDot _ _)    = 0
-entryLen cl e@(DirDotDot _ _) = 0
+entryLen cl e@(DirDot _)    = 0
+entryLen cl e@(DirDotDot _) = 0
 entryLen cl e@(Dir _ n es)    = fatSizeToClust cl $ fatDirLenB es
 entryLen cl e@(File _ n sz _) = fatSizeToClust cl sz
 
@@ -127,10 +127,10 @@ writeEntry _ clust (DirRoot _ es) = error "oops"
 writeEntry ct clust (Dir _ nm _) = do
   entryRecordShort nm 0 clust ct [DIR]
 
-writeEntry ct clust (DirDot _ q) = do
+writeEntry ct clust (DirDot q) = do
   entryRecordShort "." 0 clust ct [DIR]
 
-writeEntry ct clust (DirDotDot _ q) = do
+writeEntry ct clust (DirDotDot q) = do
   entryRecordShort ".." 0 clust ct [DIR]
 
 writeEntry ct clust (File _ nm sz _) = do
