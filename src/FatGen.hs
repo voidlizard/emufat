@@ -209,8 +209,8 @@ validFATNameASCII s = up $ take 11 $ reverse $ compl 11 $ foldl' chr "" s
 
 compl n s = replicate (n - length s) ' ' ++ s
 
-generate :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
-generate ct cl es = runFATWriter $ do
+generateData :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
+generateData ct cl es = mergeRules $ runFATWriter $ do
   forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) ->
     case e of
       DirRoot _ es  -> writeEntries bsect esect es
@@ -223,16 +223,28 @@ generate ct cl es = runFATWriter $ do
         clustOf _ n = clustOf' n
         clustOf' n = n `mod` fatSectPerClust cl
         clustOf'' fid bsect = clustOf' (maybe bsect id (M.lookup fid allocMap))
-        encode b e bs | b == e    = tell [REQ b (encodeBlock bs ++ rest b e (fromIntegral $ BS.length bs))]
-                      | otherwise = tell [RANGE b e (encodeBlock bs ++ rest b e (fromIntegral $ BS.length bs))]
-        rest a b l =
+        encode b e bs | b == e    = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
+                      | otherwise = encodeSect b e (rest bs b e (bslen bs))
+
+        encodeSect b e bs = eatSect b bs
+          where
+            eatSect from bs | bslen' bs == fsl = tell [REQ from (encodeBlock bs)]
+                            | bslen' bs < fsl  = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
+                            | otherwise = tell [REQ from (encodeBlock (BS.take fsl bs))]
+                                          >> eatSect (from+1) (BS.drop fsl bs)
+            fsl = fromIntegral fatSectLen
+
+        rest bs a b l =
           let rs = (b - a + 1) * fatSectLen - l
-          in if rs > 0 then [RLE rs 0x00] else []
-       
+          in if rs > 0 then BS.append bs (BS.replicate (fromIntegral rs) 0x00) else bs
+
         allocMap = M.fromList $ catMaybes (map pairOf es)
         pairOf (AllocEntry{beginSect=bs, entry=DirDot n}) = Just (n, bs)
         pairOf (AllocEntry{beginSect=bs, entry=DirDotDot n}) = Just (n, bs)
         pairOf _ = Nothing
+        
+        bslen' = BS.length
+        bslen = fromIntegral . BS.length
 
 --fatSample1 = filesystem $ do
 --  dir "A" emptyDir 
@@ -265,14 +277,17 @@ main = do
 --  let es = fatDataEntries CL_512 fatSample2
 --  print es
 --  print (fatMaxFileLen es)
+
+  let clust = CL_32K
+
   let sample = fatSample2
   print (universe sample)
 
-  let alloc = allocate CL_512 0 sample 
+  let alloc = allocate clust 0 sample 
   mapM_ print alloc
 
   ct <- getClockTime >>= toCalendarTime
-  let !gen = generate (Just ct) CL_512 alloc
+  let !gen = generateData (Just ct) clust alloc
   mapM_ print gen
   putStrLn ""
 --  let bs = decodeBlock $ concatMap chunks gen

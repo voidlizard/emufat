@@ -27,6 +27,15 @@ decodeBlock cs = runPut $ mapM_ chunk cs
         chunk (RLE n w) = replicateM_ n (putWord8 w)
         chunk _ = undefined
 
+mergeRules :: [Rule] -> [Rule]
+mergeRules r = (snd . runWriter) (eat r)
+  where eat (REQ a c : REQ b c' : xs) | a+1 == b && c == c' = eat (RANGE a b c : xs)
+        eat (REQ a c : RANGE a' b c' : xs) | a+1  == a' && c == c' = eat (RANGE a b c' : xs)
+        eat (RANGE a b c : RANGE a' b' c' : xs) | b+1 == a' && c == c' = eat (RANGE a b' c' : xs)
+        eat (RANGE a b c : REQ a' c' : xs) | b+1 == a' && c == c' = eat (RANGE a a' c : xs)
+        eat (x:y:xs) = tell [x] >> eat (y:xs)
+        eat x = tell x
+
 chunks :: Rule -> [Chunk]
 chunks (REQ _ c) = c
 chunks (RANGE _ _ c) = c
