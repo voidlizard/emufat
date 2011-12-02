@@ -5,6 +5,7 @@ import Data.List
 import Data.Word
 import Text.Printf
 import Control.Monad.Writer
+import Data.Binary.Put
 
 hexDump :: Int -> BS.ByteString -> [String]
 hexDump n s = map (intercalate " " . map hex) (eat [] bytes)
@@ -26,4 +27,6 @@ sliceBS n xs = (snd . runWriter) (eat xs)
               | otherwise = tell [BS.take (bn n) s] >> eat (BS.drop (bn n) s)
         bl = fromIntegral . BS.length
         bn = fromIntegral
+
+putBytes = mapM_ putWord8
 

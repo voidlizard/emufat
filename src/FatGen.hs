@@ -29,6 +29,7 @@ import Data.Data
 import Data.Typeable
 import Data.Generics.Uniplate.Data
 import Data.Binary.Put
+import Random
 
 import FAT
 import ReadFAT
@@ -314,37 +315,100 @@ adjRules sect = map withRule
   where withRule (REQ n c) = REQ (n+sect) c
         withRule (RANGE a b c) = RANGE (a+sect) (b+sect) c
 
+data FAT32GenInfo = FAT32GenInfo { clusterSize :: ClustSize32
+                                 , volSize     :: Int
+                                 , volID       :: Word32
+                                 , volLabel    :: String
+                                 , fatSectors  :: Int
+                                 } deriving (Show)
+
+fatGenBoot32 :: FAT32GenInfo -> BS.ByteString 
+fatGenBoot32 info = runPut $ do
+                                -- BOOT AREA   sect0
+  putBytes [0xEB, 0x58, 0x90]   --  0 JmpBoot
+  putBytes bsOEMName            --    OEMName
+  putWord16le bps               --    BytesPerSec
+  putWord8 spc                  --    SectPerClust
+  putWord16le 32                --    ReservedSecCnt
+  putWord8 2                    --    NumFATs
+  putWord16le 0                 --    RootEntCnt
+  putWord16le 0                 --    TotSec16
+  putWord8 0xF8                 --    Media
+  putWord16le 0                 --    FAT16Sz
+  putWord16le 0x3F              --    SectPerTract
+  putWord16le 0xFF              --    NumHeads
+  putWord32le 0                 --    HiddSec
+  putWord32le sectNum           --    TotSec32
+                                -- FAT32 Structure
+  putWord32le fsect             --    FATSz32
+  putWord16le 0                 --    ExtFlags
+  putWord16le 0                 --    FSVer
+  putWord32le 2                 --    RootClus
+  putWord16le 1                 --    FSInfo
+  putWord16le 6                 --    BkBootSec
+  putBytes (replicate 12 0)     --    Reserved
+  putWord8 0                    --    DrvNum
+  putWord8 0                    --    Reserved1
+  putWord8 0x29                 --    BootSig
+  putWord32le (volID info)      --    VolID
+  putNameASCII label            --    VolLab, 11 bytes
+  putBytes fsName               -- 82 FileSysType
+  putBytes (replicate 420 0)    --    OS Boot code
+  putWord16le 0xAA55            --    Boot sect. signature
+                                -- FS Info Sector, sect1
+  putWord32le 0x41615252        --    LeadSig
+  putBytes (replicate 480 0)    --    Reserved
+  putWord32le 0x61417272        --    StructSig
+  putWord32le 0xFFFFFFFF        --    FreeCount
+  putWord32le 0xFFFFFFFF        --    NxtFree
+  putBytes (replicate 12 0)     --    Reserved
+  putWord32le 0xAA550000        --    TrailSign
+ 
+  where bsOEMName = [0x6d, 0x6b, 0x64, 0x6f, 0x73, 0x66, 0x73, 0x00]
+        sectNum = w32 (len `div` fatSectLen)
+        len = volSize info
+        cl  = clusterSize info
+        bps = fromIntegral fatSectLen
+        spc = fromIntegral (fatSectPerClust cl)
+        fsect = w32 $ fatSectors info
+        label = volLabel info
+        fsName = take 8 $ BS.unpack $ BS.take 8 $ runPut $ putNameASCII "FAT32"
+        w32 = fromIntegral
+
 main = do
---  let !q = fatEncode CL_512 (fatSample2)
---  print (fatDirLenB (entries fatSample1))
---  print (fatDirLenB (entries fatSample2))
---  let es = fatDataEntries CL_512 fatSample2
---  print es
---  print (fatMaxFileLen es)
 
   let clust = CL_4K
 
   let sample = fatSample2
   let !alloc = allocate clust 0 sample
 
+  newStdGen >>= setStdGen
+  volId <- randomW32 
+
   ct <- getClockTime >>= toCalendarTime
   let gen = generateData (Just ct) clust alloc
   let !fat1 = getFAT'' $ genFAT' clust alloc
 
-  print (length fat1)
+  let fatStart = 2
 
-  let !fat  = encodeFAT 0 fat1
-
---  print (length fat)
+  let !fat  = encodeFAT fatStart fat1
 
   let adj = rsect $ last fat
   let fatdata = adjRules (adj+1) gen
 
-  mapM_ print fat
-  mapM_ print fatdata
+  let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart)
+  let fatBin  = fatGenBoot32 fatInfo
 
-  putStrLn ""
-  putStrLn "DONE"
+  BS.hPut stdout fatBin
+
+--  mapM_ print fat
+--  mapM_ print fatdata
+
+--  putStrLn ""
+--  putStrLn "DONE"
+
+randomW32 :: IO Word32
+randomW32 = liftM fromIntegral (randomIO :: IO Int)
 
 hex32 :: Word32 -> String
 hex32 x = printf "%08X" (fromIntegral x :: Int) 
