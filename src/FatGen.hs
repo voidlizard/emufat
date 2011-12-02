@@ -375,6 +375,17 @@ fatGenBoot32 info = runPut $ do
         fsName = take 8 $ BS.unpack $ BS.take 8 $ runPut $ putNameASCII "FAT32"
         w32 = fromIntegral
 
+encodeRaw :: Int -> BS.ByteString -> [Rule]
+encodeRaw from bs = mergeRules $ evalState (execWriterT (eat bs)) from
+  where eat bs | BS.null bs = return () 
+               | otherwise = msplit bs block eat
+        block chunk = do
+          i <- get
+          tell [REQ i (encodeBlock chunk)] >> modify succ
+ 
+        msplit xs f1 f2 = let (a, b) = BS.splitAt fsl xs in f1 a >> f2 b
+        fsl = fromIntegral fatSectLen
+
 main = do
 
   let clust = CL_4K
@@ -394,12 +405,21 @@ main = do
   let !fat  = encodeFAT fatStart fat1
 
   let adj = rsect $ last fat
-  let fatdata = adjRules (adj+1) gen
 
-  let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart)
+  let fat2 = encodeFAT (adj+1) fat1
+  let adj2 = rsect $ last fat
+  let gen2 = generateData (Just ct) clust (allocate clust (adj2+1) sample) 
+
+  let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart + 1)
   let fatBin  = fatGenBoot32 fatInfo
 
-  BS.hPut stdout fatBin
+  mapM_  print (encodeRaw 0 fatBin)
+  mapM_  print fat
+  mapM_  print fat2
+  mapM_  print gen2
+--  mapM_  print fatdata
+
+--  BS.hPut stdout fatBin
 
 --  mapM_ print fat
 --  mapM_ print fatdata
