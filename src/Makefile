@@ -1,4 +1,4 @@
 all:
 	ghc ./FsEncode.hs
 	ghc ./ReadFAT.hs
-	ghc ./FatGen.hs
+	ghc -O2 ./FatGen.hs

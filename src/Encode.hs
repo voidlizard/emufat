@@ -1,13 +1,21 @@
 module Encode where
 
-import Data.Word (Word8)
+import Data.Word (Word8, Word32)
 import qualified Data.ByteString.Lazy as BS
 import Control.Monad.Writer
 import Data.Binary.Put
 import Data.List
 
 data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
-data Chunk = SEQ BS.ByteString | RLE Int Word8 | BLOCK Int deriving (Eq, Ord, Show)
+data Chunk = SEQ BS.ByteString
+           | RLE Int Word8 
+           | SER Word32 Word32
+           | NSER128 Word32 Int Word32 -- base offset step
+           | BLOCK Int deriving (Eq, Ord, Show)
+
+rsect :: Rule -> Int
+rsect (REQ n _) = n
+rsect (RANGE _ n _) = n
 
 encodeBlock :: BS.ByteString -> [Chunk]
 encodeBlock bs = eat [] [] groups

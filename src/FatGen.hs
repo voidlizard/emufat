@@ -246,11 +246,144 @@ generateData ct cl es = mergeRules $ runFATWriter $ do
         bslen' = BS.length
         bslen = fromIntegral . BS.length
 
---fatSample1 = filesystem $ do
---  dir "A" emptyDir 
---  dir "B" emptyDir 
+type ClusterTable = [Word32] 
+
+getFAT'' :: [(Int, [Word32])] -> ClusterTable
+getFAT'' x = execWriter $ do
+  tell [0x0FFFFFF8, fatLastCluster32]
+  mapM_ (tell . snd) x
+
+genFAT' :: ClustSize32 -> [AllocEntry] -> [(Int, [Word32])]
+genFAT' cl alloc = (snd . runWriter) $ do
+  forM_ alloc $ \(AllocEntry{beginSect=bs, endSect=es}) -> do
+    tell [ (bs, (take (clen bs es - 1) [2 + 1 + start bs .. ]) ++ [fatLastCluster32]) ]
+  where spc  = fatSectPerClust cl
+        clen a b = (b - a + 1) `div` spc
+        w32 x = fromIntegral x :: Word32
+        start bs = fromIntegral (bs `div` spc) :: Word32
+
+encodeFAT :: Int -> ClusterTable -> [Rule]
+encodeFAT from xs = runEncode (eat xs)
+  where eat xs | length xs <= ns = sector xs
+               | otherwise = sector (take ns xs) >> eat (drop ns xs)
+
+        runEncode f = mergeSeries $ evalState (execWriterT f) from
+
+        sector chunk = do
+          i <- lift get
+          lift $ modify succ
+          tell [REQ i (normalize (encodeSeries chunk))]
+
+        ns = fatSectLen `div` 4
+
+        mergeSeries rules = execWriter (eat rules)
+          where 
+            mCnd1 n n' a b a' b' = n+1 == n' && (b+1) == a' && (b - a) == (b' - a')
+            mCnd2 n n' bs off sp a b =
+              (n+1) == n' && sp == (b-a+1) && bs+(fromIntegral (n'-off))*sp == a
+
+            eat (REQ n [SER a b] : REQ n' [SER a' b'] : xs) | mCnd1 n n' a b a' b' =
+              eat (RANGE n n' [NSER128 a n (b - a + 1)] : xs)
+
+            eat (RANGE f t [NSER128 bs off sp] : REQ n [SER a b] : xs) | mCnd2 t n bs off sp a b =
+              eat (RANGE f n [NSER128 bs off sp] : xs)
+
+            eat (x:y:xs) = tell [x] >> eat (y:xs)
+            eat x = tell x
+
+        normalize :: [Chunk] -> [Chunk]
+        normalize xs = normRLE normSer
+          where normSer = execWriter (mapM_ withSer xs)
+                withSer (SER a b) | (b - a) < 4 = genBSeq a b
+                withSer x = tell [x]
+                genBSeq a b = tell $ encodeBlock (runPut (mapM_ putWord32le [a .. b]))
+                normRLE xs = execWriter (eatRLE xs)
+                eatRLE (RLE n x : RLE n' x' : xs) | x == x' = eatRLE (RLE (n+n') x : xs)
+                eatRLE (x:y:xs) = tell [x] >> eatRLE (y:xs)
+                eatRLE x = tell x
+
+encodeSeries :: [Word32] -> [Chunk]
+encodeSeries xs = (snd . runWriter) (eat series0)
+  where series0 = map (\x -> SER x x) xs
+        eat (SER a b : SER a' b' : xs) | b+1 == a' = eat (SER a b' : xs)
+        eat (x:y:xs) = tell [x] >> eat (y:xs)
+        eat x = tell x
+
+adjRules sect = map withRule
+  where withRule (REQ n c) = REQ (n+sect) c
+        withRule (RANGE a b c) = RANGE (a+sect) (b+sect) c
+
+main = do
+--  let !q = fatEncode CL_512 (fatSample2)
+--  print (fatDirLenB (entries fatSample1))
+--  print (fatDirLenB (entries fatSample2))
+--  let es = fatDataEntries CL_512 fatSample2
+--  print es
+--  print (fatMaxFileLen es)
+
+  let clust = CL_4K
+
+  let sample = fatSample2
+--  print (universe sample)
+
+  let alloc = allocate clust 0 sample
+--  mapM_ print alloc
+
+  ct <- getClockTime >>= toCalendarTime
+  let gen = generateData (Just ct) clust alloc
+
+--  mapM_ putStrLn (hexDump 16 bs) 
+
+  let fat1 = getFAT'' $ genFAT' clust alloc
+
+--  putStrLn "PIU!"
+--  let !wtf = slice (128) fat1
+--  print (length fat1)
+--  error "stop"
+
+  let !fat  = encodeFAT 0 fat1
+
+  print (length fat)
+
+  let adj = rsect $ last fat
+  let fatdata = adjRules (adj+1) gen
+
+  mapM_ print fat
+  mapM_ print fatdata
+
+--  let block0 = take (512`div`4) fat1
+
+--  let z =  intercalate "\n" $ map ( unwords . map hex32 ) (slice 8 block0)
+--  putStrLn z
+
+--  let !enc0 = encodeSeries 0 block0
+
+--  let blocksRaw = slice (512`div`4) fat1
+--  let !sectors   = map (encodeSeries) blocksRaw
+
+--  forM_ (zip sectors [0..]) $ \(enc, i) -> do
+--    putStrLn (printf "FAT SECTOR %d" (i :: Int))
+--    mapM_ print (slice 2 enc)
+--    putStrLn ""
+
+--  let blocks = sliceBS 512 fat1
+
+--  printf "FAT SECTORS: %d\n" (length blocks)
+
+--  putStrLn (show . length)) blocks
+
+--  let !fe = map encodeBlock blocks
+
+--  mapM_ print fe
+
+  putStrLn ""
+  putStrLn "DONE"
+
+hex32 :: Word32 -> String
+hex32 x = printf "%08X" (fromIntegral x :: Int) 
 
 fatSample2 = filesystem $ do
+  file "file0" (16384)
   dir "A" $ do
     file "file1" (megs 100)
     dir "C" $ do
@@ -269,38 +402,3 @@ fatSample3 = filesystem $ do
       dir "C" $ emptyDir 
       
   dir "D" $ do emptyDir
-
-main = do
---  let !q = fatEncode CL_512 (fatSample2)
---  print (fatDirLenB (entries fatSample1))
---  print (fatDirLenB (entries fatSample2))
---  let es = fatDataEntries CL_512 fatSample2
---  print es
---  print (fatMaxFileLen es)
-
-  let clust = CL_32K
-
-  let sample = fatSample2
-  print (universe sample)
-
-  let alloc = allocate clust 0 sample 
-  mapM_ print alloc
-
-  ct <- getClockTime >>= toCalendarTime
-  let !gen = generateData (Just ct) clust alloc
-  mapM_ print gen
-  putStrLn ""
---  let bs = decodeBlock $ concatMap chunks gen
---  BS.hPut stdout bs
-
---  mapM_ putStrLn (hexDump 16 bs) 
-
-  putStrLn "DONE"
-
---  fn <- liftM (!! 0) getArgs
---  fat <- readFAT fn
---  let tbl = allocTable fat 3 (100 * 1024 * 1024)
---  BS.hPut stdout tbl
---  print (tbl)
---  mapM_ putStrLn (hexDump 32 tbl)
-
