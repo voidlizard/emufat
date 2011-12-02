@@ -264,12 +264,13 @@ genFAT' cl alloc = (snd . runWriter) $ do
 
 encodeFAT :: Int -> ClusterTable -> [Rule]
 encodeFAT from xs = runEncode (eat xs)
-  where eat xs | length xs <= ns = sector xs
-               | otherwise = sector (take ns xs) >> eat (drop ns xs)
+  where eat [] = sector []
+        eat xs = sector (take ns xs) >> eat (drop ns xs)
 
         runEncode f = mergeSeries $ evalState (execWriterT f) from
-
-        sector chunk = do
+        
+        sector chunk | null chunk = tell []
+                     | otherwise  = do
           i <- lift get
           lift $ modify succ
           tell [REQ i (normalize (encodeSeries chunk))]
@@ -324,57 +325,23 @@ main = do
   let clust = CL_4K
 
   let sample = fatSample2
---  print (universe sample)
-
-  let alloc = allocate clust 0 sample
---  mapM_ print alloc
+  let !alloc = allocate clust 0 sample
 
   ct <- getClockTime >>= toCalendarTime
   let gen = generateData (Just ct) clust alloc
+  let !fat1 = getFAT'' $ genFAT' clust alloc
 
---  mapM_ putStrLn (hexDump 16 bs) 
-
-  let fat1 = getFAT'' $ genFAT' clust alloc
-
---  putStrLn "PIU!"
---  let !wtf = slice (128) fat1
---  print (length fat1)
---  error "stop"
+  print (length fat1)
 
   let !fat  = encodeFAT 0 fat1
 
-  print (length fat)
+--  print (length fat)
 
   let adj = rsect $ last fat
   let fatdata = adjRules (adj+1) gen
 
   mapM_ print fat
   mapM_ print fatdata
-
---  let block0 = take (512`div`4) fat1
-
---  let z =  intercalate "\n" $ map ( unwords . map hex32 ) (slice 8 block0)
---  putStrLn z
-
---  let !enc0 = encodeSeries 0 block0
-
---  let blocksRaw = slice (512`div`4) fat1
---  let !sectors   = map (encodeSeries) blocksRaw
-
---  forM_ (zip sectors [0..]) $ \(enc, i) -> do
---    putStrLn (printf "FAT SECTOR %d" (i :: Int))
---    mapM_ print (slice 2 enc)
---    putStrLn ""
-
---  let blocks = sliceBS 512 fat1
-
---  printf "FAT SECTORS: %d\n" (length blocks)
-
---  putStrLn (show . length)) blocks
-
---  let !fe = map encodeBlock blocks
-
---  mapM_ print fe
 
   putStrLn ""
   putStrLn "DONE"
