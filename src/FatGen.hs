@@ -372,7 +372,7 @@ fatGenBoot32 info = runPut $ do
         spc = fromIntegral (fatSectPerClust cl)
         fsect = w32 $ fatSectors info
         label = volLabel info
-        fsName = take 8 $ BS.unpack $ BS.take 8 $ runPut $ putNameASCII "FAT32"
+        fsName = take 8 $ BS.unpack $ runPut $ putNameASCII "FAT32"
         w32 = fromIntegral
 
 encodeRaw :: Int -> BS.ByteString -> [Rule]
