@@ -386,6 +386,31 @@ encodeRaw from bs = mergeRules $ evalState (execWriterT (eat bs)) from
         msplit xs f1 f2 = let (a, b) = BS.splitAt fsl xs in f1 a >> f2 b
         fsl = fromIntegral fatSectLen
 
+sortRules :: [Rule] -> [Rule]
+sortRules = sortBy sf
+  where sf a b = compare (fsect a) (fsect b)
+
+data CmpTree = GEQ Int CmpTree CmpTree | CODE [Rule]
+  deriving (Show)
+
+mkCmpTree :: [Rule] -> CmpTree
+mkCmpTree r = mkTree' rulemap
+  where rulemap = M.fromList $ map (\x -> (fsect x, x)) r
+        avg :: Int -> Int -> Int
+        avg a b = a + ((b - a) `div` 2)
+
+        splitGeq n m =
+          let (a, b, c) = M.splitLookup n m
+          in (a, c `M.union` (maybe M.empty (M.singleton n) b))
+
+        mkTree' xs | M.null xs     = CODE [] 
+                   | M.size xs < 3 = CODE (map snd (M.toList xs))
+                   | otherwise =
+          let (kmin, kmax) = (fst $ M.findMin xs, fst $ M.findMax xs)
+              n = avg kmin kmax
+              (le, geq) = splitGeq n xs
+          in GEQ n (mkTree' le) (mkTree' geq)
+
 main = do
 
   let clust = CL_4K
@@ -413,10 +438,16 @@ main = do
   let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart + 1)
   let fatBin  = fatGenBoot32 fatInfo
 
-  mapM_  print (encodeRaw 0 fatBin)
-  mapM_  print fat
-  mapM_  print fat2
-  mapM_  print gen2
+  let rules = concat [encodeRaw 0 fatBin, fat, fat2, gen2]
+
+--  mapM_ (mapM_ print) (slice 4 rules)
+
+  print $ (mkCmpTree rules)
+
+--  mapM_  print (encodeRaw 0 fatBin)
+--  mapM_  print fat
+--  mapM_  print fat2
+--  mapM_  print gen2
 --  mapM_  print fatdata
 
 --  BS.hPut stdout fatBin

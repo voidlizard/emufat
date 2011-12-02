@@ -17,6 +17,10 @@ rsect :: Rule -> Int
 rsect (REQ n _) = n
 rsect (RANGE _ n _) = n
 
+fsect :: Rule -> Int
+fsect (REQ n _) = n
+fsect (RANGE n _ _) = n
+
 encodeBlock :: BS.ByteString -> [Chunk]
 encodeBlock bs = eat [] [] groups
   where groups  = group (BS.unpack bs)
