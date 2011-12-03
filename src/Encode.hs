@@ -3,8 +3,10 @@ module Encode where
 import Data.Word (Word8, Word32)
 import qualified Data.ByteString.Lazy as BS
 import Control.Monad.Writer
+import Control.Monad.State
 import Data.Binary.Put
 import Data.List
+import qualified Data.Map as M
 
 data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
 data Chunk = SEQ BS.ByteString
@@ -12,6 +14,28 @@ data Chunk = SEQ BS.ByteString
            | SER Word32 Word32
            | NSER128 Word32 Int Word32 -- base offset step
            | BLOCK Int deriving (Eq, Ord, Show)
+
+
+data CmpTree = GEQ Int CmpTree CmpTree | CODE [Rule]
+  deriving (Show)
+
+mkCmpTree :: [Rule] -> CmpTree
+mkCmpTree r = mkTree' rulemap
+  where rulemap = M.fromList $ map (\x -> (fsect x, x)) r
+        avg :: Int -> Int -> Int
+        avg a b = a + ((b - a) `div` 2)
+
+        splitGeq n m =
+          let (a, b, c) = M.splitLookup n m
+          in (a, c `M.union` (maybe M.empty (M.singleton n) b))
+
+        mkTree' xs | M.null xs     = CODE [] 
+                   | M.size xs < 3 = CODE (map snd (M.toList xs))
+                   | otherwise =
+          let ks = map fst $ M.toAscList xs
+              n = ks !! (length ks `div` 2)
+              (le, geq) = splitGeq n xs
+          in GEQ n (mkTree' le) (mkTree' geq)
 
 rsect :: Rule -> Int
 rsect (REQ n _) = n
@@ -32,6 +56,19 @@ encodeBlock bs = eat [] [] groups
         packRle r [] acc = r : acc
         packRle r seq acc = r : packseq seq : acc
         packseq seq = SEQ (BS.pack (reverse seq))
+
+
+encodeRaw :: Int -> Int -> BS.ByteString -> [Rule]
+encodeRaw blocklen from bs = mergeRules $ evalState (execWriterT (eat bs)) from
+  where eat bs | BS.null bs = return () 
+               | otherwise = msplit bs block eat
+        block chunk = do
+          i <- get
+          tell [REQ i (encodeBlock chunk)] >> modify succ
+ 
+        msplit xs f1 f2 = let (a, b) = BS.splitAt fsl xs in f1 a >> f2 b
+        fsl = fromIntegral blocklen
+
 
 decodeBlock :: [Chunk] -> BS.ByteString
 decodeBlock cs = runPut $ mapM_ chunk cs

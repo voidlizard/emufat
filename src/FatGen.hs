@@ -315,21 +315,22 @@ adjRules sect = map withRule
   where withRule (REQ n c) = REQ (n+sect) c
         withRule (RANGE a b c) = RANGE (a+sect) (b+sect) c
 
-data FAT32GenInfo = FAT32GenInfo { clusterSize :: ClustSize32
-                                 , volSize     :: Int
-                                 , volID       :: Word32
-                                 , volLabel    :: String
-                                 , fatSectors  :: Int
+data FAT32GenInfo = FAT32GenInfo { clusterSize  :: ClustSize32
+                                 , volSize      :: Int
+                                 , volID        :: Word32
+                                 , volLabel     :: String
+                                 , fatSectors   :: Int
+                                 , reservedSect :: Maybe Int
                                  } deriving (Show)
 
 fatGenBoot32 :: FAT32GenInfo -> BS.ByteString 
-fatGenBoot32 info = runPut $ do
+fatGenBoot32 info = addRsvd $ runPut $ do
                                 -- BOOT AREA   sect0
   putBytes [0xEB, 0x58, 0x90]   --  0 JmpBoot
   putBytes bsOEMName            --    OEMName
   putWord16le bps               --    BytesPerSec
   putWord8 spc                  --    SectPerClust
-  putWord16le 32                --    ReservedSecCnt
+  putWord16le rsvd              --    ReservedSecCnt
   putWord8 2                    --    NumFATs
   putWord16le 0                 --    RootEntCnt
   putWord16le 0                 --    TotSec16
@@ -372,44 +373,15 @@ fatGenBoot32 info = runPut $ do
         spc = fromIntegral (fatSectPerClust cl)
         fsect = w32 $ fatSectors info
         label = volLabel info
+        rsvd' = maybe 32 id (reservedSect info)
+        rsvd = fromIntegral rsvd' :: Word16
         fsName = take 8 $ BS.unpack $ runPut $ putNameASCII "FAT32"
         w32 = fromIntegral
+        addRsvd bs = BS.append bs (BS.replicate rst 0)
+          where len = fromIntegral $ BS.length bs
+                rst = fromIntegral $ (rsvd' * fatSectLen) - len
 
-encodeRaw :: Int -> BS.ByteString -> [Rule]
-encodeRaw from bs = mergeRules $ evalState (execWriterT (eat bs)) from
-  where eat bs | BS.null bs = return () 
-               | otherwise = msplit bs block eat
-        block chunk = do
-          i <- get
-          tell [REQ i (encodeBlock chunk)] >> modify succ
- 
-        msplit xs f1 f2 = let (a, b) = BS.splitAt fsl xs in f1 a >> f2 b
-        fsl = fromIntegral fatSectLen
 
-sortRules :: [Rule] -> [Rule]
-sortRules = sortBy sf
-  where sf a b = compare (fsect a) (fsect b)
-
-data CmpTree = GEQ Int CmpTree CmpTree | CODE [Rule]
-  deriving (Show)
-
-mkCmpTree :: [Rule] -> CmpTree
-mkCmpTree r = mkTree' rulemap
-  where rulemap = M.fromList $ map (\x -> (fsect x, x)) r
-        avg :: Int -> Int -> Int
-        avg a b = a + ((b - a) `div` 2)
-
-        splitGeq n m =
-          let (a, b, c) = M.splitLookup n m
-          in (a, c `M.union` (maybe M.empty (M.singleton n) b))
-
-        mkTree' xs | M.null xs     = CODE [] 
-                   | M.size xs < 3 = CODE (map snd (M.toList xs))
-                   | otherwise =
-          let (kmin, kmax) = (fst $ M.findMin xs, fst $ M.findMax xs)
-              n = avg kmin kmax
-              (le, geq) = splitGeq n xs
-          in GEQ n (mkTree' le) (mkTree' geq)
 
 main = do
 
@@ -435,10 +407,13 @@ main = do
   let adj2 = rsect $ last fat
   let gen2 = generateData (Just ct) clust (allocate clust (adj2+1) sample) 
 
-  let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart + 1)
+  let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart + 1) Nothing
   let fatBin  = fatGenBoot32 fatInfo
 
-  let rules = concat [encodeRaw 0 fatBin, fat, fat2, gen2]
+--  print (BS.length fatBin)
+--  error "stop"
+
+  let rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
 
 --  mapM_ (mapM_ print) (slice 4 rules)
 
