@@ -12,9 +12,8 @@ data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
 data Chunk = SEQ BS.ByteString
            | RLE Int Word8 
            | SER Word32 Word32
-           | NSER128 Word32 Int Word32 -- base offset step
-           | BLOCK Int deriving (Eq, Ord, Show)
-
+           | NSER Word32 Int Word32 -- base offset step
+           deriving (Eq, Ord, Show)
 
 data CmpTree = GEQ Int CmpTree CmpTree | CODE [Rule]
   deriving (Show)

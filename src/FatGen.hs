@@ -32,8 +32,8 @@ import Data.Binary.Put
 import Random
 
 import FAT
-import ReadFAT
 import Encode
+import VMCode 
 import Util
 
 data Entry =  DirRoot    Int [Entry]
@@ -285,10 +285,10 @@ encodeFAT from xs = runEncode (eat xs)
               (n+1) == n' && sp == (b-a+1) && bs+(fromIntegral (n'-off))*sp == a
 
             eat (REQ n [SER a b] : REQ n' [SER a' b'] : xs) | mCnd1 n n' a b a' b' =
-              eat (RANGE n n' [NSER128 a n (b - a + 1)] : xs)
+              eat (RANGE n n' [NSER a n (b - a + 1)] : xs)
 
-            eat (RANGE f t [NSER128 bs off sp] : REQ n [SER a b] : xs) | mCnd2 t n bs off sp a b =
-              eat (RANGE f n [NSER128 bs off sp] : xs)
+            eat (RANGE f t [NSER bs off sp] : REQ n [SER a b] : xs) | mCnd2 t n bs off sp a b =
+              eat (RANGE f n [NSER bs off sp] : xs)
 
             eat (x:y:xs) = tell [x] >> eat (y:xs)
             eat x = tell x
@@ -382,7 +382,6 @@ fatGenBoot32 info = addRsvd $ runPut $ do
                 rst = fromIntegral $ (rsvd' * fatSectLen) - len
 
 
-
 main = do
 
   let clust = CL_4K
@@ -414,10 +413,13 @@ main = do
 --  error "stop"
 
   let rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
+  let tree = mkCmpTree rules
+  let vm = mkVMCode tree 
+
+  mapM_ print vm 
 
 --  mapM_ (mapM_ print) (slice 4 rules)
 
-  print $ (mkCmpTree rules)
 
 --  mapM_  print (encodeRaw 0 fatBin)
 --  mapM_  print fat
