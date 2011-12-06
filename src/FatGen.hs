@@ -385,9 +385,9 @@ fatGenBoot32 info = addRsvd $ runPut $ do
 
 main = do
 
-  let clust = CL_4K
+  let clust = CL_32K
 
-  let sample = fatSample2
+  let sample = fatSample5
   let !alloc = allocate clust 0 sample
 
   newStdGen >>= setStdGen
@@ -413,15 +413,17 @@ main = do
 --  print (BS.length fatBin)
 --  error "stop"
 
-  let rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
+  let !rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
   let tree = mkCmpTree rules
   let vm = mkVMCode tree 
 
   let binary = toBinary vm
 
-  BS.hPut stdout binary 
---  mapM_ print vm 
+  forM_ vm $ \(l, cmds) -> do
+    printf "%-5s\n" ("L" ++ show l ++ ":")
+    mapM_ print cmds
 
+--  BS.hPut stdout binary 
 --  mapM_ (mapM_ print) (slice 4 rules)
 
 
@@ -465,3 +467,48 @@ fatSample3 = filesystem $ do
       dir "C" $ emptyDir 
       
   dir "D" $ do emptyDir
+
+fatSample4 = filesystem $ do
+  file "file1" (megs 100)
+  file "file2" (megs 100)
+  file "file3" (megs 100)
+  file "file4" (megs 100)
+  file "file5" (megs 100)
+  file "file6" (megs 100)
+  file "file7" (megs 100)
+  file "file8" (megs 100)
+  file "file9" (megs 100)
+  file "file10" (megs 100)
+  file "file11" (megs 100)
+  file "file12" (megs 100)
+  file "file13" (megs 100)
+  file "file14" (megs 100)
+  file "file15" (megs 100)
+  file "file16" (megs 100)
+  file "file17" (megs 100)
+  file "file18" (megs 100)
+  file "file19" (megs 100)
+  file "file20" (megs 100)
+
+fatSample5 = filesystem $ do
+  file "file1" (gigs 1)
+  file "file2" (gigs 1)
+  file "file3" (gigs 1)
+  file "file4" (gigs 1)
+  file "file5" (gigs 1)
+  file "file6" (gigs 1)
+  file "file7" (gigs 1)
+  file "file8" (gigs 1)
+  file "file9" (gigs 1)
+  file "file10" (gigs 1)
+  file "file11" (gigs 1)
+  file "file12" (gigs 1)
+  file "file13" (gigs 1)
+  file "file14" (gigs 1)
+  file "file15" (gigs 1)
+  file "file16" (gigs 1)
+  file "file17" (gigs 1)
+  file "file18" (gigs 1)
+  file "file19" (gigs 1)
+  file "file20" (gigs 1)
+

@@ -20,10 +20,10 @@ class OpcodeCL a where
 
 data Opcode =  DUP | DROP
              | CONST
-             | JNZ | JZ | JMP | CALL | RET
+             | JNZ | JZ | JGQ | JNE | JMP | CALLT | CALL | RET
              | NOT | EQ | NEQ | GT | LE | GQ | LQ | RNG
              | LOADSN
-             | SER | NSER
+             | SER | NSER | NSER128
              | RLE1 | RLE2 | RLE3 | RLE4 | RLE5 | RLE6 | RLE7 | RLE8
              | RLE16 | RLE32 | RLE64 | RLE128 | RLE256 | RLE512 | RLEN
              | NOP
@@ -33,9 +33,9 @@ data Opcode =  DUP | DROP
 
 instance OpcodeCL Opcode where
   isRLE  x = x `elem` [RLE1 .. RLEN]
-  arity0 x = x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALL, RET, NOP, EXIT])
-  arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN])
-  arity2 x = x `elem` ([SER])
+  arity0 x = x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALLT, RET, NOP, EXIT])
+  arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN] ++ [CALL])
+  arity2 x = x `elem` ([SER, NSER128])
   arity3 x = x `elem` ([NSER])
 
 data CmdArg = W32 Word32 | W16 Word16 | W8 Word8 | ADDR Addr
@@ -104,6 +104,7 @@ toBinary cmds = encodeM (pass3 (pass2 (pass1 cmds)))
     encode (CmdCondJmp x a) = putOpcode x >> putArg32 (ADDR a)
 
     encode (Cmd2 SER a b) = putOpcode SER >> putArg32 a >> putArg32 b
+    encode (Cmd2 NSER128 a b) = putOpcode NSER128 >> putArg32 a >> putArg32 b
     encode (Cmd3 NSER a b c) = putOpcode NSER >> putArg32 a >> putArg32 b >> putArg32 c
     encode x = error $ "BAD COMMAND " ++ show x
 
