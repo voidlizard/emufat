@@ -3,23 +3,40 @@ module EncodeVM where
 import Prelude hiding (EQ)
 import Data.Word
 import Data.Maybe
+import qualified Data.Map as M
+import Data.Functor.Identity
 import Text.Printf
 import Data.Binary.Put
+import Control.Monad.State
+import Control.Monad.Writer
 import qualified Data.ByteString.Lazy as BS
+
+class OpcodeCL a where
+  isRLE  :: a -> Bool
+  arity0 :: a -> Bool
+  arity1 :: a -> Bool
+  arity2 :: a -> Bool
+  arity3 :: a -> Bool
 
 data Opcode =  DUP | DROP
              | CONST
              | JNZ | JZ | JMP | CALL | RET
-             | NOT
-             | EQ | NEQ | GT | LE | GQ | LQ | RNG
+             | NOT | EQ | NEQ | GT | LE | GQ | LQ | RNG
              | LOADSN
              | SER | NSER
              | RLE1 | RLE2 | RLE3 | RLE4 | RLE5 | RLE6 | RLE7 | RLE8
              | RLE16 | RLE32 | RLE64 | RLE128 | RLE256 | RLE512 | RLEN
              | NOP
              | EXIT
-  deriving (Enum, Show)
+  deriving (Eq, Ord, Enum, Show)
 
+
+instance OpcodeCL Opcode where
+  isRLE  x = x `elem` [RLE1 .. RLEN]
+  arity0 x = x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALL, RET, NOP, EXIT])
+  arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN])
+  arity2 x = x `elem` ([SER])
+  arity3 x = x `elem` ([NSER])
 
 data CmdArg = W32 Word32 | W16 Word16 | W8 Word8 | ADDR Addr
 
@@ -65,11 +82,53 @@ instance Show Cmd where
 
 ind x s = concat (replicate x  "    ")  ++ s
 
-toBinary :: [Cmd] -> BS.ByteString
-toBinary cmds = runPut $ do
-  undefined
+toBinary :: [(Label, [Cmd])] -> BS.ByteString
+toBinary cmds = encodeM (pass3 (pass2 (pass1 cmds)))
+  where
+    pass3 m  = execWriter $ forM_ cmds $ \(l, cs) -> mapM_ (repl m) cs
 
-  where norm = undefined
+    pass2 :: [(Label, Int)] -> M.Map Label Int
+    pass2 xs = M.fromList (execWriter (foldM_ blockOff 0 xs))
+    pass1    = map (\(l,c) -> (l, fromIntegral $ BS.length $ encodeM c))
 
+    encodeM :: [Cmd] -> BS.ByteString
+    encodeM c = runPut (mapM_ encode c)
 
+    encode (Cmd0 x)     = putOpcode x 
+    encode (CmdConst x) = putOpcode CONST >> putWord32be x
+    encode (Cmd1 x a) | isRLE x   = putOpcode x >> putArg8 a
+                      | otherwise = putOpcode x >> putArg32 a
+    encode (RawByte b)  = putWord8 b
+    encode (CmdLabel _) = return ()
+    encode (CmdJmp x a) = putOpcode x >> putArg32 (ADDR a)
+    encode (CmdCondJmp x a) = putOpcode x >> putArg32 (ADDR a)
+
+    encode (Cmd2 SER a b) = putOpcode SER >> putArg32 a >> putArg32 b
+    encode (Cmd3 NSER a b c) = putOpcode NSER >> putArg32 a >> putArg32 b >> putArg32 c
+    encode x = error $ "BAD COMMAND " ++ show x
+
+    putOpcode = putWord8 . op
+    putArg8 (W32 a) = putWord8 (fromIntegral a)
+    putArg8 (W16 a) = putWord8 (fromIntegral a)
+    putArg8 (W8 a) = putWord8 (fromIntegral a)
+    putArg8 (ADDR _ ) = error "BAD W8 (ADDRESS)"
+
+    putArg32 (W32 a) = putWord8 (fromIntegral a)
+    putArg32 (W16 a) = putWord8 (fromIntegral a)
+    putArg32 (W8 a) = putWord8 (fromIntegral a)
+    putArg32 (ADDR (ALabel a)) = putWord32be (fromIntegral 0)
+    putArg32 (ADDR (AOffset a)) = putWord32be (fromIntegral a)
+
+    op :: Opcode -> Word8
+    op = fromIntegral . fromEnum
+
+    blockOff sz (l', c) = tell [(l', sz)] >> return (sz + c)
+
+    repl m x@(CmdJmp a (ALabel n)) = repl' (M.lookup n m) x
+    repl m x@(CmdCondJmp a (ALabel n)) = repl' (M.lookup n m) x
+    repl m x = tell [x]
+    
+    repl' (Just n) (CmdJmp op x) = tell [CmdJmp op (AOffset n)]
+    repl' (Just n) (CmdCondJmp op x) = tell [CmdCondJmp op (AOffset n)]
+    repl' Nothing  x = error $ "BAD LABEL " ++ show x
 

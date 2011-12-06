@@ -33,7 +33,8 @@ import Random
 
 import FAT
 import Encode
-import VMCode 
+import VMCode
+import EncodeVM (toBinary)
 import Util
 
 data Entry =  DirRoot    Int [Entry]
@@ -416,7 +417,10 @@ main = do
   let tree = mkCmpTree rules
   let vm = mkVMCode tree 
 
-  mapM_ print vm 
+  let binary = toBinary vm
+
+  BS.hPut stdout binary 
+--  mapM_ print vm 
 
 --  mapM_ (mapM_ print) (slice 4 rules)
 
