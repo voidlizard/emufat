@@ -419,14 +419,14 @@ main = do
 
   let binary = toBinary vm
 
---  forM_ vm $ \(l, cmds) -> do
---    printf "%-5s\n" ("L" ++ show l ++ ":")
---    mapM_ print cmds
+  forM_ vm $ \(l, cmds) -> do
+    printf "%-5s\n" ("L" ++ show l ++ ":")
+    mapM_ print cmds
 
 --  forM_ (sort (seqs rules)) $ \bs -> do
 --    putStrLn $  intercalate " " (hexDump 256 bs)
 
-  BS.hPut stdout binary 
+--  BS.hPut stdout binary 
 --  mapM_ (mapM_ print) (slice 4 rules)
 
 
