@@ -22,7 +22,7 @@ data Opcode =  DUP | DROP
              | CONST
              | JNZ | JZ | JGQ | JNE | JMP | CALLT | CALL | RET
              | NOT | EQ | NEQ | GT | LE | GQ | LQ | RNG
-             | LOADSN
+             | LOADS2 | LOADS3 | LOADS4 | LOADS5 | LOADS6 | LOADS7 | LOADS8 | LOADS9 | LOADS10 | LOADSN
              | SER | NSER | NSER128
              | RLE1 | RLE2 | RLE3 | RLE4 | RLE5 | RLE6 | RLE7 | RLE8
              | RLE16 | RLE32 | RLE64 | RLE128 | RLE256 | RLE512 | RLEN
@@ -33,7 +33,7 @@ data Opcode =  DUP | DROP
 
 instance OpcodeCL Opcode where
   isRLE  x = x `elem` [RLE1 .. RLEN]
-  arity0 x = x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALLT, RET, NOP, EXIT])
+  arity0 x = x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALLT, RET, NOP, EXIT] ++ [LOADS2 .. LOADS10])
   arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN] ++ [CALL])
   arity2 x = x `elem` ([SER, NSER128])
   arity3 x = x `elem` ([NSER])
