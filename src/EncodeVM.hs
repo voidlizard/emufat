@@ -31,6 +31,7 @@ data Cmd =  Cmd0 Opcode
           | Cmd2 Opcode CmdArg CmdArg
           | Cmd3 Opcode CmdArg CmdArg CmdArg 
           | CmdJmp Opcode Addr
+          | CmdCondJmp Opcode Addr
           | CmdLabel Label
           | RawByte Word8
 
@@ -58,6 +59,7 @@ instance Show Cmd where
   show (Cmd2 code a b)   = ind 1 $ show code ++ " " ++ show a ++ " " ++ show b
   show (Cmd3 code a b c) = ind 1 $ show code ++ " " ++ show a ++ " " ++ show b ++ " " ++ show c
   show (CmdJmp code a)   = ind 1 $ show code ++ " " ++ show a
+  show (CmdCondJmp code a) = ind 1 $ show code ++ " " ++ show a
   show (RawByte m)       = ind 1 $ "BYTE " ++ printf "%02X" m
   show (CmdLabel lbl)    = "L" ++ show lbl ++ ":"
 
