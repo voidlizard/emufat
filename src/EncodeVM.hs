@@ -80,6 +80,12 @@ instance Show Cmd where
   show (RawByte m)       = ind 1 $ "BYTE " ++ printf "%02X" m
   show (CmdLabel lbl)    = "L" ++ show lbl ++ ":"
 
+unArg (W8 a)  = fromIntegral a 
+unArg (W16 a) = fromIntegral a
+unArg (W32 a) = fromIntegral a
+unArg (ADDR (ALabel a)) = a
+unArg (ADDR (AOffset a)) = a
+
 ind x s = concat (replicate x  "    ")  ++ s
 
 toBinary :: [(Label, [Cmd])] -> BS.ByteString
@@ -96,6 +102,10 @@ toBinary cmds = encodeM (pass3 (pass2 (pass1 cmds)))
 
     encode (Cmd0 x)     = putOpcode x 
     encode (CmdConst x) = putOpcode CONST >> putWord32be x
+
+    encode (Cmd1 LOADSN a) | (unArg a) < 256 = putOpcode LOADSN >> putArg8 a
+                           | otherwise = error $ "BAD LOADSN ARG" ++ show a
+
     encode (Cmd1 x a) | isRLE x   = putOpcode x >> putArg8 a
                       | otherwise = putOpcode x >> putArg32 a
     encode (RawByte b)  = putWord8 b
