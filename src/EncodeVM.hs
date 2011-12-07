@@ -17,12 +17,15 @@ class OpcodeCL a where
   arity1 :: a -> Bool
   arity2 :: a -> Bool
   arity3 :: a -> Bool
+  firstCode :: a
+  lastCode  :: a
 
 data Opcode =  DUP | DROP
              | CONST | CRNG
              | JNZ | JZ | JGQ | JNE | JMP | CALLT | CALL | RET
              | NOT | EQ | NEQ | GT | LE | GQ | LQ | RNG
-             | LOADS2 | LOADS3 | LOADS4 | LOADS5 | LOADS6 | LOADS7 | LOADS8 | LOADS9 | LOADS10 | LOADSN
+             | LOADS2 | LOADS3 | LOADS4 | LOADS5 | LOADS6 | LOADS7
+             | LOADS8 | LOADS9 | LOADS10 | LOADSN
              | SER | NSER | NSER128
              | RLE1 | RLE2 | RLE3 | RLE4 | RLE5 | RLE6 | RLE7 | RLE8
              | RLE16 | RLE32 | RLE64 | RLE128 | RLE256 | RLE512 | RLEN
@@ -37,6 +40,8 @@ instance OpcodeCL Opcode where
   arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN] ++ [CALL])
   arity2 x = x `elem` ([SER, NSER128, CRNG])
   arity3 x = x `elem` ([NSER])
+  firstCode = DUP
+  lastCode  = EXIT
 
 data CmdArg = W32 Word32 | W16 Word16 | W8 Word8 | ADDR Addr
 

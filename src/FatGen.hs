@@ -35,6 +35,7 @@ import FAT
 import Encode
 import VMCode
 import EncodeVM (toBinary)
+import CWriter
 import Util
 
 data Entry =  DirRoot    Int [Entry]
@@ -429,8 +430,11 @@ main = do
       let binary = toBinary vm
       BS.hPut stdout binary
 
+    ("stubs" : _ ) -> do
+      putStrLn stubs
+
     _ -> do
-      putStrLn "Usage: FatGen bin|asm"
+      putStrLn "Usage: FatGen bin|asm|stubs"
 
 --  forM_ (sort (seqs rules)) $ \bs -> do
 --    putStrLn $  intercalate " " (hexDump 256 bs)
