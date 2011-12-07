@@ -19,7 +19,7 @@ class OpcodeCL a where
   arity3 :: a -> Bool
 
 data Opcode =  DUP | DROP
-             | CONST
+             | CONST | CRNG
              | JNZ | JZ | JGQ | JNE | JMP | CALLT | CALL | RET
              | NOT | EQ | NEQ | GT | LE | GQ | LQ | RNG
              | LOADS2 | LOADS3 | LOADS4 | LOADS5 | LOADS6 | LOADS7 | LOADS8 | LOADS9 | LOADS10 | LOADSN
@@ -35,7 +35,7 @@ instance OpcodeCL Opcode where
   isRLE  x = x `elem` [RLE1 .. RLEN]
   arity0 x = x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALLT, RET, NOP, EXIT] ++ [LOADS2 .. LOADS10])
   arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN] ++ [CALL])
-  arity2 x = x `elem` ([SER, NSER128])
+  arity2 x = x `elem` ([SER, NSER128, CRNG])
   arity3 x = x `elem` ([NSER])
 
 data CmdArg = W32 Word32 | W16 Word16 | W8 Word8 | ADDR Addr
@@ -115,6 +115,7 @@ toBinary cmds = encodeM (pass3 (pass2 (pass1 cmds)))
 
     encode (Cmd2 SER a b) = putOpcode SER >> putArg32 a >> putArg32 b
     encode (Cmd2 NSER128 a b) = putOpcode NSER128 >> putArg32 a >> putArg32 b
+    encode (Cmd2 CRNG a b) = putOpcode CRNG >> putArg32 a >> putArg32 b
     encode (Cmd3 NSER a b c) = putOpcode NSER >> putArg32 a >> putArg32 b >> putArg32 c
     encode x = error $ "BAD COMMAND " ++ show x
 

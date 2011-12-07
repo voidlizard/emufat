@@ -417,16 +417,24 @@ main = do
   let tree = mkCmpTree rules
   let vm = mkVMCode tree 
 
-  let binary = toBinary vm
+  cmd <- getArgs
 
-  forM_ vm $ \(l, cmds) -> do
-    printf "%-5s\n" ("L" ++ show l ++ ":")
-    mapM_ print cmds
+  case cmd of
+    ("asm" : _) -> do
+      forM_ vm $ \(l, cmds) -> do
+        printf "%-5s\n" ("L" ++ show l ++ ":")
+        mapM_ print cmds
+
+    ("bin" : _ ) -> do
+      let binary = toBinary vm
+      BS.hPut stdout binary
+
+    _ -> do
+      putStrLn "Usage: FatGen bin|asm"
 
 --  forM_ (sort (seqs rules)) $ \bs -> do
 --    putStrLn $  intercalate " " (hexDump 256 bs)
 
---  BS.hPut stdout binary 
 --  mapM_ (mapM_ print) (slice 4 rules)
 
 

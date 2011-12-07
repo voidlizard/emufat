@@ -100,10 +100,11 @@ mkVMCode xs = normalize $ do
  
       label s
       dup
-      const a
-      const b
-      rng
-      jnz ex
+      crng a b
+--      const a
+--      const b
+--      rng
+      jz ex
       block code'
       label ex
 
@@ -160,10 +161,12 @@ mkVMCode xs = normalize $ do
     neq = op0 NEQ
     geq = op0 GQ
     rng = op0 RNG
+    crng a b = op2 CRNG (w32 a) (w32 b)
 
     jne n = tell [CmdCondJmp JNE (addr n)]
     jgq n = tell [CmdCondJmp JGQ (addr n)]
     jnz n = tell [CmdCondJmp JNZ (addr n)]
+    jz  n = tell [CmdCondJmp JZ (addr n)]
     jmp n = tell [CmdJmp JMP (addr n)]
     label n = tell [CmdLabel n]
 
