@@ -436,25 +436,6 @@ main = do
     _ -> do
       putStrLn "Usage: FatGen bin|asm|stubs"
 
---  forM_ (sort (seqs rules)) $ \bs -> do
---    putStrLn $  intercalate " " (hexDump 256 bs)
-
---  mapM_ (mapM_ print) (slice 4 rules)
-
-
---  mapM_  print (encodeRaw 0 fatBin)
---  mapM_  print fat
---  mapM_  print fat2
---  mapM_  print gen2
---  mapM_  print fatdata
-
---  BS.hPut stdout fatBin
-
---  mapM_ print fat
---  mapM_ print fatdata
-
---  putStrLn ""
---  putStrLn "DONE"
 
 randomW32 :: IO Word32
 randomW32 = liftM fromIntegral (randomIO :: IO Int)

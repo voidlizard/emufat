@@ -55,7 +55,7 @@ stubs =
       stmt $ " *out += (((b-a)*4)%blen)"
 
     endl
-    envFunc "int runDecode" [(pt codeType, "code"), ("const int", bSize), ((pt outType, "out"))] $ do
+    envFunc "int runDecode" [(stackCellType, "n"), (pt codeType, "code"), ("const int", bSize), ((pt outType, "out"))] $ do
       indented $ do
         stmt (printf "DEFSTACK(a, %s, 16)" stackCellType)
         stmt (printf "DEFSTACK(r, %s, 8)" stackCellType)
@@ -69,6 +69,8 @@ stubs =
         stmt (pt codeType ++ op `assign` "code")
 
         endl
+
+        push a "n"
 
         put "for(;;)"
 
