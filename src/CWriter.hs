@@ -10,7 +10,9 @@ import Text.Printf
 import EncodeVM
 
 stackCellType = "uint32_t"
-
+codeType = "uint8_t"
+outType  = "char"
+bSize = "bsize"
 
 stubs :: String
 stubs = 
@@ -18,9 +20,42 @@ stubs =
     comment "top of the file"
     put "#include <stdint.h>"
     defines
+    put $ "#define DECODE32(op) (((uint32_t)(*((op)+0)<<24))|((uint32_t)(*((op)+1)<<16))|((uint32_t)(*((op)+2)<<8))|((uint32_t)(*((op)+3))))"
+    put $ "#define DECODE8(op)  (*(op))"
+    put $ "#define RLE(n, b, blen, out)  _rle((n), (b), (blen), (out))"
+    put $ "#define LOADBYTES(f, n, blen, out)  _loadbytes((f), (n), (blen), (out))"
+    put $ "#define GENSEQUENCE(a, b, blen, out) _gensequence((a), (b), (blen), (out))"
+    put $ "#define GENSEQUENCEN(top, a, b, s, blen, out)   _gensequence(((a) + ((top)-(b))*(s)), ((a) + ((top)-(b))*(s)) + ((blen)/sizeof(uint32_t)), (blen), (out))"
     types
+
     endl
-    envFunc "runDecode" $ do
+    put $ "extern void _emufat_decode_debug(uint32_t *a, uint32_t *atop, uint32_t *r, uint32_t *rtop, char *outp, char *out);"
+    endl
+
+    put $ "static void _rle(uint32_t n, char b, const int blen, char **out)"
+    braces $ indented $ do
+      stmt $ "int i = 0"
+      put  $ "for(i = 0; i < n; i++) { **out = b; *out += (i%blen); }"
+
+    put $ "static void _loadbytes(char *from, uint32_t n, const int blen, char **out)"
+    braces $ indented $ do
+      stmt $ "int i = 0"
+      put  $ "for(i = 0; i < n; i++) { **out = *from++; *out += (i%blen); }"
+
+    put $ "static void _gensequence(uint32_t a, uint32_t b, const int blen, char **out)"
+    braces $ indented $ do
+      stmt $ "uint32_t i = 0"
+      stmt $ "int j = 0"
+      put  $ "for(i = a; i <= b; i++, j = ((j+4)%blen) )"
+      braces $ indented $ do
+        stmt $ " *out[j]   = (i & 0xFF)"
+        stmt $ " *out[j+1] = ((i >> 8) & 0xFF)"
+        stmt $ " *out[j+2] = ((i >> 16) & 0xFF)"
+        stmt $ " *out[j+3] = ((i >> 24) & 0xFF)"
+      stmt $ " *out += (((b-a)*4)%blen)"
+
+    endl
+    envFunc "int runDecode" [(pt codeType, "code"), ("const int", bSize), ((pt outType, "out"))] $ do
       indented $ do
         stmt (printf "DEFSTACK(a, %s, 16)" stackCellType)
         stmt (printf "DEFSTACK(r, %s, 8)" stackCellType)
@@ -29,16 +64,24 @@ stubs =
           stmt (printf "%s %s" stackCellType t)
         endl
 
-        put "for(;;++op)"
+        stmt (printf "%s *pout = out" outType)
+
+        stmt (pt codeType ++ op `assign` "code")
+
+        endl
+
+        put "for(;;)"
+
         braces $ indented $ do
+
           put "switch(*op)"
           braces $ do
             forM_ codes $ \op -> do
               put (printf "case %s:" (show op))
               indented $ decode op
               endl
-        put "default:"
-        indented $ exit
+            put "default:"
+            indented $ exit
       
       exitLabel
       indented $ stmt "return 0"
@@ -57,83 +100,179 @@ stubs =
       put "#define TOP(a)     (*(a##top))"
       put "#define POP(a)     (*(a##top)--)"
       put "#define PUSH(a,v) (*(++(a##top)) = v)"
+      put "#define NEXT(x)    continue"
+      put "#define JUMP(x, b, o)  ((x) = (b) + (o)); continue"
+      put "#define SKIP(x, n)  (x += n)"
+      put "#define PC(x, b) ((unsigned int)(x - b))"
 
     types = endl >> endl >> comment "type declarations" >> endl >> endl
 
-    envFunc :: String -> StubM () -> StubM ()
-    envFunc n f = put (printf "int %s()" n) >> braces f
+    envFunc :: String -> [(String, String)] -> StubM () -> StubM ()
+    envFunc n as f = put (printf "%s(%s)" n args) >> braces f
+      where args = intercalate ", " (map (\(a,b) -> printf "%s %s" a b) as)
+
+    op = "op"
+
+    pt s = printf "%s *" s
+
+    pc s = printf "op = code + %s" s
+    
+    pc'  = printf "PC(op, code)"
 
     opcodes = do
       forM_ codes $ \op -> do
         put (printf "#define %-12s %d" (show op) (fromEnum op))
 
     braces f = do
-      put "{" >> endl >> f >> endl >> put "}" >> endl
+      put "{" >> f >> put "}" >> endl
 
     codes :: [Opcode]
     codes = [firstCode .. lastCode]
 
-    decode (DUP)     = stmt (push' a (top' a)) >> next
-    decode (DROP)    = pop a >> next
-    decode (CONST)   = stmt (push' a decode32) >> next
-    decode (CRNG)    = exit
-    decode (JNZ)     = exit
-    decode (JZ)      = exit
-    decode (JGQ)     = exit
-    decode (JNE)     = exit
-    decode (JMP)     = exit
-    decode (CALLT)   = exit
-    decode (CALL)    = exit
-    decode (RET)     = exit
-    decode (NOT)     = exit
+    next0 = skip "1" >> next
+    next1 = skip "5" >> next
 
-    decode (EQ)      = do
-      stmt $ tmp0 `assign` (pop' a)
-      stmt $ tmp1 `assign` (pop' a)
-      stmt (push' a (tmp0 `eq` tmp1))
+    decode (DUP)     = stmt (push' a (top' a)) >> next0
+    decode (DROP)    = pop a >> next0
+    decode (CONST)   = stmt (push' a decode32) >> next1
+
+    decode (CRNG)    = do
+      skip "1"
+      stmt (tmp0 `assign` pop' a)
+      stmt (tmp1 `assign` decode32) >> skip "4"
+      stmt (tmp2 `assign` decode32) >> skip "4"
+      push a ( _and (tmp0 `gq` tmp1) (tmp0 `lq` tmp2) )
       next
 
-    decode (NEQ)     = exit
-    decode (GT)      = exit
-    decode (LE)      = exit
-    decode (GQ)      = exit
-    decode (LQ)      = exit
-    decode (RNG)     = exit
-    decode (LOADS2)  = exit
-    decode (LOADS3)  = exit
-    decode (LOADS4)  = exit
-    decode (LOADS5)  = exit
-    decode (LOADS6)  = exit
-    decode (LOADS7)  = exit
-    decode (LOADS8)  = exit
-    decode (LOADS9)  = exit
-    decode (LOADS10) = exit
-    decode (LOADSN)  = exit
-    decode (SER)     = exit
-    decode (NSER)    = exit
-    decode (NSER128) = exit
-    decode (RLE1)    = exit
-    decode (RLE2)    = exit
-    decode (RLE3)    = exit
-    decode (RLE4)    = exit
-    decode (RLE5)    = exit
-    decode (RLE6)    = exit
-    decode (RLE7)    = exit
-    decode (RLE8)    = exit
-    decode (RLE16)   = exit
-    decode (RLE32)   = exit
-    decode (RLE64)   = exit
-    decode (RLE128)  = exit
-    decode (RLE256)  = exit
-    decode (RLE512)  = exit
-    decode (RLEN)    = exit
-    decode (NOP)     = skipByte >> next >> endl
+    decode (JNZ)     = do
+      skip "1"
+      stmt (tmp0 `assign` pop' a)
+      stmt (tmp1 `assign` decode32) >> skip "4"
+      _if1 tmp0 (jump tmp1)
+      next
+
+    decode (JZ)      = do 
+      skip "1"
+      stmt (tmp0 `assign` pop' a)
+      stmt (tmp1 `assign` decode32) >> skip "4"
+      _if1 (not' tmp0) (jump tmp1)
+      next
+
+    decode (JGQ)     = do
+      skip "1"
+      stmt (tmp1 `assign` pop' a)
+      stmt (tmp0 `assign` pop' a)
+      stmt (tmp2 `assign` decode32) >> skip "4"
+      _if1 (tmp0 `gq` tmp1) (jump tmp2)
+      next
+
+    decode (JNE)     = do 
+      skip "1"
+      stmt (tmp1 `assign` pop' a)
+      stmt (tmp0 `assign` pop' a)
+      stmt (tmp2 `assign` decode32) >> skip "4"
+      _if1 (tmp0 `neq` tmp1) (jump tmp2)
+      next
+
+    decode (JMP)     = skip "1" >> jump (decode32)
+
+    decode (CALLT)   = do
+      skip "1"
+      stmt (tmp0 `assign` pop' a)
+      stmt (push' r pc')
+      jump tmp0
+
+    decode (CALL)    = do
+      skip "1"
+      stmt (tmp0 `assign` decode32) >> skip "4"
+      stmt (push' r pc')
+      jump tmp0
+
+    decode (RET)     = jump (pop' r)
+
+    decode (NOT)     =
+      stmt (top' a `assign` (not' (top' a))) >> next0
+
+    decode (EQ)      = binop eq tmp0 tmp1  >> next0
+    decode (NEQ)     = binop neq tmp0 tmp1 >> next0
+    decode (GT)      = binop gt tmp1 tmp0  >> next0
+    decode (LE)      = binop le tmp1 tmp0  >> next0
+    decode (GQ)      = binop gq tmp1 tmp0  >> next0
+    decode (LQ)      = binop lq tmp1 tmp0  >> next0
+
+    decode (RNG)     = do
+      stmt (tmp2 `assign` pop' a)
+      stmt (tmp1 `assign` pop' a)
+      stmt (tmp0 `assign` pop' a)
+      push a ( _and (tmp0 `gq` tmp1) (tmp0 `lq` tmp2) )
+      next0
+
+    decode (LOADS2)  = loads 2
+    decode (LOADS3)  = loads 3
+    decode (LOADS4)  = loads 4
+    decode (LOADS5)  = loads 5
+    decode (LOADS6)  = loads 6
+    decode (LOADS7)  = loads 7
+    decode (LOADS8)  = loads 8
+    decode (LOADS9)  = loads 9
+    decode (LOADS10) = loads 10
+    decode (LOADSN)  = loadsn  >> next
+
+    decode (SER)     = do
+      skip "1"
+      stmt (tmp0 `assign` decode32) >> skip "4"
+      stmt (tmp1 `assign` decode32) >> skip "4"
+      stmt (printf "GENSEQUENCE(%s, %s, %s, &pout)" tmp0 tmp1 bSize)
+      next
+
+    decode (NSER)    = do
+      skip "1"
+      stmt (tmp0 `assign` decode32) >> skip "4"
+      stmt (tmp1 `assign` decode32) >> skip "4"
+      stmt (tmp2 `assign` decode32) >> skip "4"
+      stmt (tmp3 `assign` pop' a)
+      stmt (printf "GENSEQUENCEN(%s, %s, %s, %s, %s, &pout)" tmp3 tmp0 tmp1 tmp2 bSize)
+      next
+
+    decode (NSER128) = do
+      skip "1"
+      stmt (tmp0 `assign` decode32) >> skip "4"
+      stmt (tmp1 `assign` decode32) >> skip "4"
+      stmt (tmp3 `assign` pop' a)
+      stmt (printf "GENSEQUENCEN(%s, %s, %s, 128, %s, &pout)" tmp3 tmp0 tmp1 bSize)
+      next
+
+    decode (RLE1)    = rle 1
+    decode (RLE2)    = rle 2 
+    decode (RLE3)    = rle 3 
+    decode (RLE4)    = rle 4
+    decode (RLE5)    = rle 5
+    decode (RLE6)    = rle 6
+    decode (RLE7)    = rle 7
+    decode (RLE8)    = rle 8
+    decode (RLE16)   = rle 16
+    decode (RLE32)   = rle 32
+    decode (RLE64)   = rle 64
+    decode (RLE128)  = rle 128
+    decode (RLE256)  = rle 256
+    decode (RLE512)  = rle 512
+    decode (RLEN)    = rlen
+
+    decode (NOP)     = next
     decode (EXIT)    = exit
+    decode (DEBUG)   = do
+      stmt "_emufat_decode_debug(a, atop, r, rtop, pout, out)"
+      exit
 
     tmp0 = "tmp0"
     tmp1 = "tmp1"
     tmp2 = "tmp2"
     tmp3 = "tmp3"
+
+    binop fn t0 t1 = do
+      stmt $ t1 `assign` (pop' a)
+      stmt $ t0 `assign` (pop' a)
+      stmt (push' a (t0 `fn` t1))
 
     assign :: String -> String -> String
     assign a b = printf "%s = %s" a b
@@ -141,10 +280,25 @@ stubs =
     eq :: String -> String -> String
     eq a b = printf "(%s == %s)" a b
 
+    neq :: String -> String -> String
+    neq a b = printf "(%s != %s)" a b
+
+    gt :: String -> String -> String
+    gt a b = printf "(%s > %s)" a b
+
+    le a b = printf "(%s < %s)" a b
+    lq a b = printf "(%s <= %s)" a b
+
+    gq :: String -> String -> String
+    gq a b = printf "(%s >= %s)" a b
+
     a = "a"
     r = "r"
 
     tmps = [ tmp0, tmp1, tmp2, tmp3 ]
+
+    not' :: String -> String
+    not' s = printf "!(%s)" s
 
     top' :: String -> String
     top' a = printf "TOP(%s)" a
@@ -160,19 +314,34 @@ stubs =
     push s v = stmt $ push' s v
 
     decode32 = printf "DECODE32(op)"
+    decode8  = printf "DECODE8(op)"
+
+    skip :: String -> StubM ()
+    skip s = stmt (printf "SKIP(op, (%s))" s)
 
     skipByte = stmt "*op++"
 
-    next = stmt "continue" 
+    next = stmt "NEXT(op)"
 
     goto s = stmt ("goto " ++ s)
 
+    _and :: String -> String -> String
+    _and a b = printf "(%s && %s)" a b
+
+    _if1 s f = do
+      put (printf "if(%s)" s)
+      braces $ indented $ f
+
+    jump v = stmt $ printf "JUMP(op, code, %s)" v
+
     exit = goto exitLabelName 
+
+    l s = s ++ ":"
 
     exitLabelName = "_exit"
 
     exitLabel :: StubM ()
-    exitLabel = put (exitLabelName ++ ":")
+    exitLabel = put (l exitLabelName)
 
     nothing :: StubM ()
     nothing = return ()
@@ -198,6 +367,36 @@ stubs =
     endl = put' "" 
 
     stmt s = put (s ++ ";")
+
+    loads :: Int -> StubM ()
+    loads n = do
+      skip "1"
+      stmt (printf "LOADBYTES(op, %d, %s, &pout)" n bSize)
+      skip (show (n))
+      next
+
+    loadsn :: StubM ()
+    loadsn  = do
+      skip "1"
+      stmt ( tmp0 `assign` pop' a ) 
+      stmt (printf "LOADBYTES(op, tmp0, %s, &pout)" bSize)
+      skip "tmp0"
+      next
+
+    rle :: Int -> StubM ()
+    rle n = do
+      skip "1"
+      stmt (tmp0 `assign` decode8) >> skip "1"
+      stmt (printf "RLE(%d, (unsigned char)%s, %s, &pout)" n tmp0 bSize)
+      next
+
+    rlen :: StubM ()
+    rlen  = do
+      skip "1"
+      stmt (tmp0 `assign` decode8) >> skip "4"
+      stmt (tmp1 `assign` pop' a)
+      stmt (printf "RLE(%s, (unsigned char)%s, %s, &pout)" tmp1 tmp0 bSize)
+      next
 
 type StubM a = WriterT [String] (StateT Int Identity) a
 
