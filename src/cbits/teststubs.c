@@ -23,12 +23,13 @@ void dump(const int len, char *buf) {
 }
 
 #define MAXOPCODES 16384
+#define SECTOR 512
 
 static uint8_t opcodes[MAXOPCODES] = { EXIT };
 
 int main(int argc, char **argv) {
-    const int blen = 512;
-    unsigned char buf[512] = { 0 };
+    const int blen = SECTOR;
+    unsigned char buf[SECTOR] = { 0 };
     size_t read = 0;
     int n  = 0;
 
@@ -36,9 +37,8 @@ int main(int argc, char **argv) {
 
     read = fread(opcodes, 1, MAXOPCODES, stdin);
     runDecode(n, opcodes, blen, buf);
-/*    dump(512, buf);*/
+    fwrite(buf, 1, blen, stdout);
 
     return 0;
 }
-
 
