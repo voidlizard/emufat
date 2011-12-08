@@ -89,8 +89,6 @@ stubs =
       indented $ stmt "return 0"
 
   where
-    envFile :: StubM () -> String
-    envFile f = intercalate "\n" (evalState (execWriterT f) 0)
 
     defines :: StubM ()
     defines = do
@@ -121,22 +119,13 @@ stubs =
     
     pc'  = printf "PC(op, code)"
 
-    opcodes = do
-      forM_ codes $ \op -> do
-        put (printf "#define %-12s %d" (show op) (fromEnum op))
-
-    braces f = do
-      put "{" >> f >> put "}" >> endl
-
-    codes :: [Opcode]
-    codes = [firstCode .. lastCode]
 
     next0 = skip "1" >> next
     next1 = skip "5" >> next
 
     decode (DUP)     = stmt (push' a (top' a)) >> next0
     decode (DROP)    = pop a >> next0
-    decode (CONST)   = stmt (push' a decode32) >> next1
+    decode (CONST)   = skip "1" >> stmt (push' a decode32) >> skip "4" >> next
 
     decode (CRNG)    = do
       skip "1"
@@ -260,11 +249,34 @@ stubs =
     decode (RLE512)  = rle 512
     decode (RLEN)    = rlen
 
-    decode (NOP)     = next
+    decode (NOP)     = next0
+
     decode (EXIT)    = exit
+
     decode (DEBUG)   = do
       stmt "_emufat_decode_debug(a, atop, r, rtop, pout, out)"
       exit
+
+    decode (OUTLE) = do 
+      stmt (tmp0 `assign` pop' a)
+      outbyte ("tmp0  & 0xFF")
+      outbyte ("(tmp0 >> 8) & 0xFF")
+      outbyte ("(tmp0 >> 16) & 0xFF")
+      outbyte ("(tmp0 >> 24) & 0xFF")
+      next0
+
+    decode (OUTBE) = do
+      stmt (tmp0 `assign` pop' a)
+      outbyte ("(tmp0 >> 24) & 0xFF")
+      outbyte ("(tmp0 >> 16) & 0xFF")
+      outbyte ("(tmp0 >> 8) & 0xFF")
+      outbyte ("tmp0  & 0xFF")
+      next0
+
+    decode (OUTB)  = do
+      stmt (tmp0 `assign` pop' a)
+      outbyte ("tmp0 & 0xFF")
+      next0
 
     tmp0 = "tmp0"
     tmp1 = "tmp1"
@@ -345,30 +357,6 @@ stubs =
     exitLabel :: StubM ()
     exitLabel = put (l exitLabelName)
 
-    nothing :: StubM ()
-    nothing = return ()
-
-    indented :: StubM a -> StubM a
-    indented f = do 
-      modify succ 
-      v <- f
-      modify pred
-      return v
-
-    comment s = put $ "// " ++ s
-
-    put :: String -> StubM ()
-    put s = do
-      i <- get
-      let idt = concat (replicate (i*4) " ")
-      tell [(idt ++ s)]
-
-    put' :: String -> StubM ()
-    put' s = tell [s]
-
-    endl = put' "" 
-
-    stmt s = put (s ++ ";")
 
     loads :: Int -> StubM ()
     loads n = do
@@ -399,6 +387,54 @@ stubs =
       stmt (tmp1 `assign` pop' a)
       stmt (printf "RLE(%s, (unsigned char)%s, %s, &pout)" tmp1 tmp0 bSize)
       next
+
+    outbyte :: String -> StubM ()
+    outbyte s = stmt (printf "*pout++ = (char)(%s)" s)
+    
+    put = line
+    put' = line'
+
+opcodes = do
+  forM_ codes $ \op -> do
+    line (printf "#define %-12s %d" (show op) (fromEnum op))
+
+codes :: [Opcode]
+codes = [firstCode .. lastCode]
+
+nothing :: StubM ()
+nothing = return ()
+
+indented :: StubM a -> StubM a
+indented f = do 
+  modify succ 
+  v <- f
+  modify pred
+  return v
+
+comment :: String -> StubM ()
+comment s = line $ "// " ++ s
+
+line :: String -> StubM ()
+line s = do
+  i <- get
+  let idt = concat (replicate (i*4) " ")
+  tell [(idt ++ s)]
+
+line' :: String -> StubM ()
+line' s = tell [s]
+
+endl :: StubM ()
+endl = line' "" 
+
+stmt :: String -> StubM ()
+stmt s = line (s ++ ";")
+
+braces :: StubM a -> StubM ()
+braces f = do
+  line "{" >> f >> line "}" >> endl
+
+envFile :: StubM () -> String
+envFile f = intercalate "\n" (evalState (execWriterT f) 0)
 
 type StubM a = WriterT [String] (StateT Int Identity) a
 

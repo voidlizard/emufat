@@ -1,5 +1,39 @@
 {-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
-module VMCode (mkVMCode) where
+module VMCode (mkVMCode
+              ,normalize
+              ,runGen
+              ,newLabel
+              ,addr
+              ,block
+              ,byte
+              ,cnst
+              ,crng
+              ,dup
+              ,drop_
+              ,eq
+              ,exit
+              ,outle, outbe, outb
+              ,geq
+              ,jgq
+              ,jmp ,jne ,jnz ,jz
+              ,label
+              ,loadsn
+              ,neq
+              ,op0
+              ,op1
+              ,op2
+              ,op3
+              ,rle
+              ,rng
+              ,nop ,debug
+              ,skip
+              ,w16
+              ,w32
+              ,w8
+              ,withLabel
+              ,GenT(..)
+              ,GenM(..)
+              ) where
 
 import Prelude hiding (EQ)
 import Control.Monad.State
@@ -68,7 +102,7 @@ mkVMCode xs = normalize $ do
 
       label s
       dup
-      const n
+      cnst n
       jgq (labelOf r)
 --      geq
 --      jnz  (labelOf r)
@@ -86,10 +120,8 @@ mkVMCode xs = normalize $ do
  
       label s
       dup
-      const n
+      cnst n
       jne ex
---      neq
---      jnz ex
       block code'
       label ex
 
@@ -101,31 +133,9 @@ mkVMCode xs = normalize $ do
       label s
       dup
       crng a b
---      const a
---      const b
---      rng
       jz ex
       block code'
       label ex
-
-    loadsn bs = do
-      forM_ (slice 256 (BS.unpack bs)) $ \xs -> do
-        case bl of
-          2 -> op0 LOADS2
-          3 -> op0 LOADS3
-          4 -> op0 LOADS4
-          5 -> op0 LOADS5
-          6 -> op0 LOADS6
-          7 -> op0 LOADS7
-          8 -> op0 LOADS8
-          9 -> op0 LOADS9
-          10 -> op0 LOADS10
-          _ -> op1 LOADSN bl8 
-        mapM_ byte xs
-        where bl = (BS.length bs)
-              bl8 = w8 bl
-              op0 op = tell [Cmd0 op]
-
 
     scanC :: Chunk -> GenM ()
 
@@ -151,72 +161,6 @@ mkVMCode xs = normalize $ do
 
     scanmC xs = mapM_ scanC xs >> op0 EXIT
 
-    skip :: GenM ()
-    skip   = return ()
-
-    dup = op0 DUP
-
-    eq :: GenM ()
-    eq  = op0 V.EQ 
-    neq = op0 NEQ
-    geq = op0 GQ
-    rng = op0 RNG
-    crng a b = op2 CRNG (w32 a) (w32 b)
-
-    jne n = tell [CmdCondJmp JNE (addr n)]
-    jgq n = tell [CmdCondJmp JGQ (addr n)]
-    jnz n = tell [CmdCondJmp JNZ (addr n)]
-    jz  n = tell [CmdCondJmp JZ (addr n)]
-    jmp n = tell [CmdJmp JMP (addr n)]
-    label n = tell [CmdLabel n]
-
-    block (l, ops) = tell [CmdLabel l] >> tell ops
-
-    rle 0 x = skip
-    rle 1 x = op1 RLE1 (w8 x)
-    rle 2 x = op1 RLE2 (w8 x)
-    rle 3 x = op1 RLE3 (w8 x)
-    rle 4 x = op1 RLE4 (w8 x)
-    rle 5 x = op1 RLE5 (w8 x)
-    rle 6 x = op1 RLE6 (w8 x)
-    rle 7 x = op1 RLE7 (w8 x)
-    rle 8 x = op1 RLE8 (w8 x)
-    rle 16 x = op1 RLE16 (w8 x)
-    rle 32 x = op1 RLE32 (w8 x)
-    rle 64 x = op1 RLE64 (w8 x)
-    rle 128 x = op1 RLE128 (w8 x)
-    rle 256 x = op1 RLE256 (w8 x)
-    rle 512 x = op1 RLE512 (w8 x)
-    rle n x =  const n >> op1 RLEN (w8 x)
-
-    byte x = tell [RawByte (fromIntegral x)]
-    const x = tell [CmdConst (fromIntegral x)]
-
-    op0 :: Opcode -> GenM () 
-    op0 x = tell [Cmd0 x]
-
-    op1 x a = tell [Cmd1 x a]
-    op2 x a b = tell [Cmd2 x a b]
-    op3 x a b c = tell [Cmd3 x a b c]
-
-    addr :: Label -> Addr 
-    addr l = ALabel l
-
-    w8 :: Integral a => a -> CmdArg
-    w8 x = W8 (fromIntegral x :: Word8)
-
-    w16 :: Integral a => a -> CmdArg
-    w16 x = W16 (fromIntegral x :: Word16)
-
-    w32 :: Integral a => a -> CmdArg
-    w32 x = W32 (fromIntegral x :: Word32)
-
-    withLabel x = do
-      l <- newLabel
-      return (l,x)
-
-    exit = op0 EXIT
-
     subs = mapM_ (\e -> block e >> op0 RET) (M.elems seqm)
 
     runGen' f = do
@@ -224,6 +168,101 @@ mkVMCode xs = normalize $ do
       let (r,s) = runState (execWriterT (runGT f)) st
       put s
       return r
+
+skip :: GenM ()
+skip   = return ()
+
+dup  = op0 DUP
+drop_ = op0 DROP
+nop = op0 NOP
+
+debug = op0 DEBUG
+
+eq :: GenM ()
+eq  = op0 V.EQ 
+neq = op0 NEQ
+geq = op0 GQ
+rng = op0 RNG
+crng a b = op2 CRNG (w32 a) (w32 b)
+
+outle = op0 OUTLE
+outbe = op0 OUTBE
+outb  = op0 OUTB
+
+jne n = tell [CmdCondJmp JNE (addr n)]
+jgq n = tell [CmdCondJmp JGQ (addr n)]
+jnz n = tell [CmdCondJmp JNZ (addr n)]
+jz  n = tell [CmdCondJmp JZ (addr n)]
+jmp n = tell [CmdJmp JMP (addr n)]
+label n = tell [CmdLabel n]
+
+block (l, ops) = tell [CmdLabel l] >> tell ops
+
+rle 0 x = skip
+rle 1 x = op1 RLE1 (w8 x)
+rle 2 x = op1 RLE2 (w8 x)
+rle 3 x = op1 RLE3 (w8 x)
+rle 4 x = op1 RLE4 (w8 x)
+rle 5 x = op1 RLE5 (w8 x)
+rle 6 x = op1 RLE6 (w8 x)
+rle 7 x = op1 RLE7 (w8 x)
+rle 8 x = op1 RLE8 (w8 x)
+rle 16 x = op1 RLE16 (w8 x)
+rle 32 x = op1 RLE32 (w8 x)
+rle 64 x = op1 RLE64 (w8 x)
+rle 128 x = op1 RLE128 (w8 x)
+rle 256 x = op1 RLE256 (w8 x)
+rle 512 x = op1 RLE512 (w8 x)
+rle n x =  cnst n >> op1 RLEN (w8 x)
+
+loadsn bs = do
+  forM_ (slice 256 (BS.unpack bs)) $ \xs -> do
+    case bl of
+      2 -> op0 LOADS2
+      3 -> op0 LOADS3
+      4 -> op0 LOADS4
+      5 -> op0 LOADS5
+      6 -> op0 LOADS6
+      7 -> op0 LOADS7
+      8 -> op0 LOADS8
+      9 -> op0 LOADS9
+      10 -> op0 LOADS10
+      _ -> op1 LOADSN bl8 
+    mapM_ byte xs
+    where bl = (BS.length bs)
+          bl8 = w8 bl
+          op0 op = tell [Cmd0 op]
+
+
+byte x = tell [RawByte (fromIntegral x)]
+
+cnst :: Integral a => a -> GenM ()
+cnst x = tell [CmdConst (fromIntegral x)]
+
+op0 :: Opcode -> GenM () 
+op0 x = tell [Cmd0 x]
+
+op1 x a = tell [Cmd1 x a]
+op2 x a b = tell [Cmd2 x a b]
+op3 x a b c = tell [Cmd3 x a b c]
+
+addr :: Label -> Addr 
+addr l = ALabel l
+
+w8 :: Integral a => a -> CmdArg
+w8 x = W8 (fromIntegral x :: Word8)
+
+w16 :: Integral a => a -> CmdArg
+w16 x = W16 (fromIntegral x :: Word16)
+
+w32 :: Integral a => a -> CmdArg
+w32 x = W32 (fromIntegral x :: Word32)
+
+withLabel x = do
+  l <- newLabel
+  return (l,x)
+
+exit = op0 EXIT
 
 normalize :: [Cmd] -> [(Label, [Cmd])]
 normalize xs = map optBlock (mergeBlocks (optJumps blocks))

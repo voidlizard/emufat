@@ -433,8 +433,12 @@ main = do
     ("stubs" : _ ) -> do
       putStrLn stubs
 
+    ("opcodes" : _) -> do
+      let ops = envFile opcodes
+      putStrLn ops
+
     _ -> do
-      putStrLn "Usage: FatGen bin|asm|stubs"
+      putStrLn "Usage: FatGen bin|asm|stubs|opcodes"
 
 
 randomW32 :: IO Word32

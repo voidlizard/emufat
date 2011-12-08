@@ -29,6 +29,7 @@ data Opcode =  DUP | DROP
              | SER | NSER | NSER128
              | RLE1 | RLE2 | RLE3 | RLE4 | RLE5 | RLE6 | RLE7 | RLE8
              | RLE16 | RLE32 | RLE64 | RLE128 | RLE256 | RLE512 | RLEN
+             | OUTLE | OUTBE | OUTB
              | NOP
              | DEBUG
              | EXIT
@@ -37,7 +38,10 @@ data Opcode =  DUP | DROP
 
 instance OpcodeCL Opcode where
   isRLE  x = x `elem` [RLE1 .. RLEN]
-  arity0 x = x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALLT, RET, NOP, DEBUG, EXIT] ++ [LOADS2 .. LOADS10])
+
+  arity0 x = 
+    x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALLT, RET, NOP, DEBUG, EXIT] ++ [LOADS2 .. LOADS10] ++ [OUTLE .. OUTB])
+
   arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN] ++ [CALL])
   arity2 x = x `elem` ([SER, NSER128, CRNG])
   arity3 x = x `elem` ([NSER])
