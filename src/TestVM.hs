@@ -30,6 +30,7 @@ data DUMP = HEX | BIN
 --makeTest f = trace (show norm) $ norm 
 makeTest f = norm 
   where
+--    norm  = trace (show code) $ normalize ml code
     norm  = normalize ml code
     ml    = snd code'
     code  = fst code'
@@ -82,17 +83,36 @@ testJump1 = makeTest $ do
   outle
   jmp l3
 
+testJnz1 = makeTest $ do
+  l1 <- newLabel
+  l2 <- newLabel
+  l3 <- newLabel
+  l4 <- newLabel
+
+  cnst 0xDEADBEEF
+  dup
+  jnz l1
+  outle
+
+  label l2
+  label l1
+
+  cnst 0xCAFEBABE
+  outle
+
+  cnst 0xFABACADA
+  cnst 0
+  jnz l3
+  outle
+  exit
+
+  label l4
+  label l3
+  cnst 0xFFFFFFFF
+  outle
+
 
 tests = testSuite $ do
-  test "testNop"  testNop (\bs -> (BS.take 4 bs) == BS.pack [0,0,0,0] && BS.length bs == 512)
-
-
-  test "testDup"  testDup (assert $ do
-                             a <- getWord32le
-                             b <- getWord32le
-                             c <- getWord32le
-                             return $ a == 2 && b == 2 && c == 2
-                          )
 
   test "testDrop"  testDrop (assert $ getWord32le >>= return . (== 0xAB))
   test "testCrng1" testCrng1 (assert $ getWord32le >>= return . (== 1))
@@ -124,6 +144,15 @@ tests = testSuite $ do
   test "testRng4" (makeTest $ cnst 42 >> cnst 24 >> cnst 42 >> rng >> outle) (assert $ getWord32le >>= return . (== 1))
   test "testRng5" (makeTest $ cnst 90 >> cnst 24 >> cnst 42 >> rng >> outle) (assert $ getWord32le >>= return . (== 0))
 
+  test "testNop"  testNop (\bs -> (BS.take 4 bs) == BS.pack [0,0,0,0] && BS.length bs == 512)
+
+
+  test "testDup"  testDup (assert $ do
+                             a <- getWord32le
+                             b <- getWord32le
+                             c <- getWord32le
+                             return $ a == 2 && b == 2 && c == 2
+                          )
 
   test "testNot"  testNot (assert $ do
                              a <- getWord32le
@@ -144,6 +173,11 @@ tests = testSuite $ do
                                   return $ a == 0xCAFEBABE && b == 0xDEADBEEF
                                )
 
+  test "testJnz1"  testJnz1 (assert $ do
+                               a <- getWord32le
+                               b <- getWord32le
+                               return $ a == 0xCAFEBABE && b == 0xFABACADA
+                            )
 
 
 assert f bs = runGet f bs

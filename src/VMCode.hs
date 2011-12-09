@@ -282,11 +282,8 @@ normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
 --normalize xs = blocks
   where 
         blocks = flip evalState [(ml+1)..] $ execWriterT (eat1 (Nothing, []) xs)
-  
-        eat1 (Nothing, []) (CmdLabel n:xs)  = eat1 (Just n, []) xs
 
-        eat1 (Just n, [])  (CmdLabel n':xs) =
-          block (n, normBlock ((CmdJmp JMP (ALabel n')) : [])) >> eat1 (Just n', []) xs
+        eat1 (Nothing, []) (CmdLabel n:xs)  = eat1 (Just n, []) xs
 
         eat1 (Just n, bs)  (CmdLabel n':xs) =
           block (n, normBlock ((CmdJmp JMP (ALabel n')) : bs)) >> eat1 (Just n', []) xs
@@ -316,8 +313,13 @@ normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
         block b = tell [b]
         normBlock cs = reverse cs
 
-        optJumps bs = head bs : optJumps' (split (tail bs))
-          where p (n, [CmdJmp _ _]) = False
+        optJumps bs = hd bs ++ optJumps' (split (tl bs))
+          where 
+                hd (h@(_, [CmdJmp _ _]):_) = [h]
+                hd _ = []
+                tl  (h@(_, [CmdJmp _ _]):xs) = xs
+                tl _ = bs
+                p (n, [CmdJmp _ _]) = False
                 p _                 = True
                 split bs            = partition p bs
                 optJumps' (xs, [])  = xs
