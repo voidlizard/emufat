@@ -402,6 +402,11 @@ main = do
 
   let !fat  = encodeFAT fatStart fat1
 
+--  withFile "fat-test.bin" WriteMode $ flip BS.hPut (runPut $  replicateM_ (fatStart*fatSectLen) (putWord8 0) >>  mapM_ putWord32le fat1)
+--  mapM_ print fat 
+
+--  error "STOP"
+
   let adj = rsect $ last fat
 
   let fat2 = encodeFAT (adj+1) fat1
@@ -437,8 +442,11 @@ main = do
       let ops = envFile opcodes
       putStrLn ops
 
+    ("rules" : _) -> do
+      mapM_ print rules 
+
     _ -> do
-      putStrLn "Usage: FatGen bin|asm|stubs|opcodes"
+      putStrLn "Usage: FatGen bin|asm|stubs|opcodes|rules"
 
 
 randomW32 :: IO Word32

@@ -18,7 +18,7 @@ module VMCode (mkVMCode
               ,jmp ,jne ,jnz ,jz
               ,call ,ret
               ,label
-              ,ser
+              ,ser, nser, nser128
               ,loadsn
               ,neq
               ,op0
@@ -203,6 +203,9 @@ outbe = op0 OUTBE
 outb  = op0 OUTB
 
 ser x y = op2 SER (w32 x) (w32 y)
+
+nser a b c  = op3 NSER (w32 a) (w32 b) (w32 c)
+nser128 a b = op2 NSER128 (w32 a) (w32 b)
 
 jne n = tell [CmdCondJmp JNE (addr n)]
 jgq n = tell [CmdCondJmp JGQ (addr n)]

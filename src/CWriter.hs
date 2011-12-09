@@ -25,7 +25,7 @@ stubs =
     put $ "#define RLE(n, b, blen, p0, out)  _rle((n), (b), (blen), (p0), (out))"
     put $ "#define LOADBYTES(f, n, blen, p0, out)  _loadbytes((f), (n), (blen), (p0), (out))"
     put $ "#define GENSEQUENCE(a, b, blen, p0, out) _gensequence((a), (b), (blen), (p0), (out))"
-    put $ "#define GENSEQUENCEN(top, a, b, s, blen, p0, out) _gensequence(((a) + ((top)-(b))*(s)), ((a) + ((top)-(b))*(s)) + ((blen)/sizeof(uint32_t)), (blen), (p0), (out))"
+    put $ "#define GENSEQUENCEN(top, a, b, s, blen, p0, out) _gensequence(((a) + ((top)-(b))*(s)), (((a) + ((top)-(b))*(s)) + ((blen)/sizeof(uint32_t)) - 1), (blen), (p0), (out))"
     types
 
     endl

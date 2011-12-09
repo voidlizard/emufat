@@ -8,12 +8,21 @@ import Data.Binary.Put
 import Data.List
 import qualified Data.Map as M
 
+import Text.Printf
+import Util
+
 data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
 data Chunk = SEQ BS.ByteString
            | RLE Int Word8 
            | SER Word32 Word32
            | NSER Word32 Int Word32 -- base offset step
-           deriving (Eq, Ord, Show)
+           deriving (Eq, Ord)
+
+instance Show Chunk where
+  show (SEQ bs)  = printf "SEQ [%s]" (intercalate " " $ hexDump 128 bs)
+  show (RLE a n) = printf "RLE %d %d" a n
+  show (SER a b) = printf "SER %d %d" a b
+  show (NSER a b c) = printf "NSER %d %d %d" a b c
 
 data CmpTree = GEQ Int CmpTree CmpTree | CODE [Rule]
   deriving (Show)

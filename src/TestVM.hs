@@ -204,8 +204,17 @@ testCallRet1 = makeTest $ do
   cnst 0xFFFFFFFF
   outle
 
---testSer1 = makeTest $ do
---  ser 0 127 
+testNSer1 = makeTest $ do
+  cnst 0
+  nser 0 0 128
+
+testNSer2 = makeTest $ do
+  cnst 3 
+  nser 129 3 128
+
+testNSer128 = makeTest $ do
+  cnst 3 
+  nser128 129 3
 
 tests = testSuite $ do
 
@@ -313,6 +322,24 @@ tests = testSuite $ do
                                r <- replicateM  3 getWord32le
                                return $ r == [0 .. 2]
                             )
+
+  test "testNSer1" testNSer1  (assert $ do
+                                r <- replicateM 128 getWord32le
+                                return $ r == [0 .. 127]
+                              )
+
+  test "testNSer2" testNSer2  (assert $ do
+                                 return False
+                                 r <- replicateM 128 getWord32le
+                                 let a = 129 + (3-3)*128
+                                 return $ r == take 128 [a, a+1 ..]
+                              )
+  test "testNSer128" testNSer128  (assert $ do
+                                 return False
+                                 r <- replicateM 128 getWord32le
+                                 let a = 129 + (3-3)*128
+                                 return $ r == take 128 [a, a+1 ..]
+                              )
 
 assert f bs = runGet f bs
 
