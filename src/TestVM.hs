@@ -76,7 +76,7 @@ testJump1 = makeTest $ do
   cnst 0xCACAFAFA
   outle
 
-  label l2
+--  label l2
   label l1
 
   cnst 0xCAFEBABE
