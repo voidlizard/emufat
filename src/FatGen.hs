@@ -410,7 +410,7 @@ main = do
   let adj = rsect $ last fat
 
   let fat2 = encodeFAT (adj+1) fat1
-  let adj2 = rsect $ last fat
+  let adj2 = rsect $ last fat2
   let gen2 = generateData (Just ct) clust (allocate clust (adj2+1) sample) 
 
   let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart + 1) Nothing

@@ -80,12 +80,12 @@ newLabel = do
   modify succ >> return n
 
 --mkVMCode :: CmpTree -> [(Label, [Cmd])]
-mkVMCode xs = normalize maxl code 
+mkVMCode xs = normalize maxl code
   where
 
     code  = fst code'
-    maxl  = snd code'
-    code' = runGen'' (scanT xs >> subs) (fstBlock)
+    maxl  = snd code'           --  |---- this is shit and hack
+    code' = runGen'' (scanT xs >> exit >> subs) (fstBlock) -- FIXME: in fact, it's crap
 
     fstBlock = (succ.fst) (M.findMax (M.fromList (M.elems seqm)))
     seqm = runEncBS (scanSeq xs)
