@@ -1,7 +1,7 @@
 {-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 module VMCode (mkVMCode
               ,normalize
-              ,runGen
+              ,runGen, runGen''
               ,newLabel
               ,addr
               ,block
@@ -13,7 +13,7 @@ module VMCode (mkVMCode
               ,eq
               ,exit
               ,outle, outbe, outb
-              ,geq
+              ,geq, gt, le, lq
               ,jgq
               ,jmp ,jne ,jnz ,jz
               ,label
@@ -25,6 +25,7 @@ module VMCode (mkVMCode
               ,op3
               ,rle
               ,rng
+              ,not_
               ,nop ,debug
               ,skip
               ,w16
@@ -35,7 +36,7 @@ module VMCode (mkVMCode
               ,GenM(..)
               ) where
 
-import Prelude hiding (EQ)
+import Prelude hiding (EQ, GT)
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Functor.Identity
@@ -62,6 +63,9 @@ type GenM = GenT Identity
 runGen :: GenM a -> Int -> [Cmd]
 runGen f n = evalState ( execWriterT (runGT f) ) n
 
+runGen'' :: GenM a -> Int -> ([Cmd], Label)
+runGen'' f n = runState ( execWriterT (runGT f) ) n
+
 seqs :: [Rule] -> [BS.ByteString] 
 seqs rs = execWriter $ mapM_ eatR rs
   where eat (SEQ bs) = tell [bs]
@@ -74,9 +78,13 @@ newLabel = do
   modify succ >> return n
 
 --mkVMCode :: CmpTree -> [(Label, [Cmd])]
-mkVMCode xs = normalize $ do
-  runGen (scanT xs >> subs) (fstBlock)
+mkVMCode xs = normalize maxl code 
   where
+
+    code  = fst code'
+    maxl  = snd code'
+    code' = runGen'' (scanT xs >> subs) (fstBlock)
+
     fstBlock = (succ.fst) (M.findMax (M.fromList (M.elems seqm)))
     seqm = runEncBS (scanSeq xs)
     scanSeq (GEQ n l r) = scanSeq l >> scanSeq r
@@ -104,8 +112,6 @@ mkVMCode xs = normalize $ do
       dup
       cnst n
       jgq (labelOf r)
---      geq
---      jnz  (labelOf r)
       block l >> jmp _ex
       block r >> label _ex
 
@@ -175,6 +181,7 @@ skip   = return ()
 dup  = op0 DUP
 drop_ = op0 DROP
 nop = op0 NOP
+not_ = op0 NOT
 
 debug = op0 DEBUG
 
@@ -182,7 +189,12 @@ eq :: GenM ()
 eq  = op0 V.EQ 
 neq = op0 NEQ
 geq = op0 GQ
+gt  = op0 GT
+le  = op0 LE
+lq  = op0 LQ
+
 rng = op0 RNG
+
 crng a b = op2 CRNG (w32 a) (w32 b)
 
 outle = op0 OUTLE
@@ -264,12 +276,12 @@ withLabel x = do
 
 exit = op0 EXIT
 
-normalize :: [Cmd] -> [(Label, [Cmd])]
-normalize xs = map optBlock (mergeBlocks (optJumps blocks))
+normalize :: Label -> [Cmd] -> [(Label, [Cmd])]
+normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
 --normalize xs = trace (intercalate "\n" (map show xs)) $ map optBlock (mergeBlocks (optJumps blocks))
 --normalize xs = blocks
   where 
-        blocks = execWriter (eat1 (Nothing, []) xs)
+        blocks = flip evalState [(ml+1)..] $ execWriterT (eat1 (Nothing, []) xs)
   
         eat1 (Nothing, []) (CmdLabel n:xs)  = eat1 (Just n, []) xs
 
@@ -292,13 +304,19 @@ normalize xs = map optBlock (mergeBlocks (optJumps blocks))
 
         eat1 (Just n, bs) [] = block (n, normBlock bs)
 
-        eat1 (Nothing, []) _ = return () 
+        eat1 (Nothing, []) [] = return ()
+
+        eat1 (Nothing, []) xs = do
+          l <- gets head
+          modify tail
+          eat1 (Just l, []) xs
+--          eat1    error "BLOCK STARTED WITH NON-LABEL INS"
 
         eat1 (Nothing, xs) _ = error "assertion fail : normalize 1"
         block b = tell [b]
         normBlock cs = reverse cs
 
-        optJumps bs = optJumps' (split bs)
+        optJumps bs = head bs : optJumps' (split (tail bs))
           where p (n, [CmdJmp _ _]) = False
                 p _                 = True
                 split bs            = partition p bs

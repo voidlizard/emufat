@@ -135,8 +135,8 @@ toBinary cmds = encodeM (pass3 (pass2 (pass1 cmds)))
     putArg8 (W8 a) = putWord8 (fromIntegral a)
     putArg8 (ADDR _ ) = error "BAD W8 (ADDRESS)"
 
-    putArg32 (W32 a) = putWord8 (fromIntegral a)
-    putArg32 (W16 a) = putWord8 (fromIntegral a)
+    putArg32 (W32 a) = putWord32be (fromIntegral a)
+    putArg32 (W16 a) = putWord32be (fromIntegral a)
     putArg32 (W8 a) = putWord8 (fromIntegral a)
     putArg32 (ADDR (ALabel a)) = putWord32be (fromIntegral 0)
     putArg32 (ADDR (AOffset a)) = putWord32be (fromIntegral a)

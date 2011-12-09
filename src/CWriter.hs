@@ -123,7 +123,11 @@ stubs =
     next0 = skip "1" >> next
     next1 = skip "5" >> next
 
-    decode (DUP)     = stmt (push' a (top' a)) >> next0
+    decode (DUP)     = do 
+      stmt ( tmp0 `assign` "TOP(a)")
+      push a tmp0
+      next0 -- stmt (push' a (top' a)) >> next0
+
     decode (DROP)    = pop a >> next0
     decode (CONST)   = skip "1" >> stmt (push' a decode32) >> skip "4" >> next
 
