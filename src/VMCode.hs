@@ -18,6 +18,7 @@ module VMCode (mkVMCode
               ,jmp ,jne ,jnz ,jz
               ,call ,ret
               ,label
+              ,ser
               ,loadsn
               ,neq
               ,op0
@@ -154,8 +155,7 @@ mkVMCode xs = normalize maxl code
         Just (l, seq) -> op1 CALL (ADDR (ALabel l))
         Nothing       -> loadsn bs
  
-    scanC ( E.SER x y ) = do
-      op2 SER (w32 x) (w32 y)
+    scanC ( E.SER x y ) = ser x y
 
     scanC ( E.NSER b o st ) | st == 128 = do
       op2 NSER128 (w32 b) (w32 o)
@@ -201,6 +201,8 @@ crng a b = op2 CRNG (w32 a) (w32 b)
 outle = op0 OUTLE
 outbe = op0 OUTBE
 outb  = op0 OUTB
+
+ser x y = op2 SER (w32 x) (w32 y)
 
 jne n = tell [CmdCondJmp JNE (addr n)]
 jgq n = tell [CmdCondJmp JGQ (addr n)]

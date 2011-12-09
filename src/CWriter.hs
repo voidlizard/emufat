@@ -22,37 +22,48 @@ stubs =
     defines
     put $ "#define DECODE32(op) (((uint32_t)(*((op)+0)<<24))|((uint32_t)(*((op)+1)<<16))|((uint32_t)(*((op)+2)<<8))|((uint32_t)(*((op)+3))))"
     put $ "#define DECODE8(op)  (*(op))"
-    put $ "#define RLE(n, b, blen, out)  _rle((n), (b), (blen), (out))"
-    put $ "#define LOADBYTES(f, n, blen, out)  _loadbytes((f), (n), (blen), (out))"
-    put $ "#define GENSEQUENCE(a, b, blen, out) _gensequence((a), (b), (blen), (out))"
-    put $ "#define GENSEQUENCEN(top, a, b, s, blen, out)   _gensequence(((a) + ((top)-(b))*(s)), ((a) + ((top)-(b))*(s)) + ((blen)/sizeof(uint32_t)), (blen), (out))"
+    put $ "#define RLE(n, b, blen, p0, out)  _rle((n), (b), (blen), (p0), (out))"
+    put $ "#define LOADBYTES(f, n, blen, p0, out)  _loadbytes((f), (n), (blen), (p0), (out))"
+    put $ "#define GENSEQUENCE(a, b, blen, p0, out) _gensequence((a), (b), (blen), (p0), (out))"
+    put $ "#define GENSEQUENCEN(top, a, b, s, blen, p0, out) _gensequence(((a) + ((top)-(b))*(s)), ((a) + ((top)-(b))*(s)) + ((blen)/sizeof(uint32_t)), (blen), (p0), (out))"
     types
 
     endl
     put $ "extern void _emufat_decode_debug(uint32_t *a, uint32_t *atop, uint32_t *r, uint32_t *rtop, char *outp, char *out);"
     endl
 
-    put $ "static void _rle(uint32_t n, char b, const int blen, char **out)"
+    put $ "static void _rle(uint32_t n, char b, const int blen, char *begin, char **out)"
     braces $ indented $ do
       stmt $ "int i = 0"
-      put  $ "for(i = 0; i < n; i++) { **out = b; *out += (i%blen); }"
+      stmt $ "char *p = *out"
+      stmt $ "char *pe = begin + blen"
+      put  $ "for(i = 0; i < n; i++) { *p++ = b; if( p >= pe ) p = begin; }"
+      stmt $ "*out = p"
 
-    put $ "static void _loadbytes(char *from, uint32_t n, const int blen, char **out)"
+    put $ "static void _loadbytes(char *from, uint32_t n, const int blen, char *begin, char **out)"
     braces $ indented $ do
       stmt $ "int i = 0"
-      put  $ "for(i = 0; i < n; i++) { **out = *from++; *out += (i%blen); }"
+      stmt $ "char *p = *out"
+      stmt $ "char *pe = begin + blen"
+      put  $ "for(i = 0; i < n; i++) { *p++ = *from++; if( p >= pe ) p = begin; }"
+      stmt $ "*out = p"
 
-    put $ "static void _gensequence(uint32_t a, uint32_t b, const int blen, char **out)"
+    put $ "static void _gensequence(uint32_t a, uint32_t b, const int blen, char *begin, char **out)"
     braces $ indented $ do
       stmt $ "uint32_t i = 0"
-      stmt $ "int j = 0"
-      put  $ "for(i = a; i <= b; i++, j = ((j+4)%blen) )"
+      stmt $ "char *p = *out"
+      stmt $ "char *pe = begin + blen"
+      put  $ "for(i = a; i <= b; i++ )"
       braces $ indented $ do
-        stmt $ " *out[j]   = (i & 0xFF)"
-        stmt $ " *out[j+1] = ((i >> 8) & 0xFF)"
-        stmt $ " *out[j+2] = ((i >> 16) & 0xFF)"
-        stmt $ " *out[j+3] = ((i >> 24) & 0xFF)"
-      stmt $ " *out += (((b-a)*4)%blen)"
+        stmt $ " *p++ = (i & 0xFF)"
+        stmt $ " if(p >= pe) p = begin"
+        stmt $ " *p++ = ((i >> 8) & 0xFF)"
+        stmt $ " if(p >= pe) p = begin"
+        stmt $ " *p++ = ((i >> 16) & 0xFF)"
+        stmt $ " if(p >= pe) p = begin"
+        stmt $ " *p++ = ((i >> 24) & 0xFF)"
+        stmt $ " if(p >= pe) p = begin"
+      stmt $ "*out = p"
 
     endl
     envFunc "int runDecode" [(stackCellType, "n"), (pt codeType, "code"), ("const int", bSize), ((pt outType, "out"))] $ do
@@ -217,7 +228,7 @@ stubs =
       skip "1"
       stmt (tmp0 `assign` decode32) >> skip "4"
       stmt (tmp1 `assign` decode32) >> skip "4"
-      stmt (printf "GENSEQUENCE(%s, %s, %s, &pout)" tmp0 tmp1 bSize)
+      stmt (printf "GENSEQUENCE(%s, %s, %s, out, &pout)" tmp0 tmp1 bSize)
       next
 
     decode (NSER)    = do
@@ -226,7 +237,7 @@ stubs =
       stmt (tmp1 `assign` decode32) >> skip "4"
       stmt (tmp2 `assign` decode32) >> skip "4"
       stmt (tmp3 `assign` pop' a)
-      stmt (printf "GENSEQUENCEN(%s, %s, %s, %s, %s, &pout)" tmp3 tmp0 tmp1 tmp2 bSize)
+      stmt (printf "GENSEQUENCEN(%s, %s, %s, %s, %s, out, &pout)" tmp3 tmp0 tmp1 tmp2 bSize)
       next
 
     decode (NSER128) = do
@@ -234,7 +245,7 @@ stubs =
       stmt (tmp0 `assign` decode32) >> skip "4"
       stmt (tmp1 `assign` decode32) >> skip "4"
       stmt (tmp3 `assign` pop' a)
-      stmt (printf "GENSEQUENCEN(%s, %s, %s, 128, %s, &pout)" tmp3 tmp0 tmp1 bSize)
+      stmt (printf "GENSEQUENCEN(%s, %s, %s, 128, %s, out, &pout)" tmp3 tmp0 tmp1 bSize)
       next
 
     decode (RLE1)    = rle 1
@@ -365,7 +376,7 @@ stubs =
     loads :: Int -> StubM ()
     loads n = do
       skip "1"
-      stmt (printf "LOADBYTES(op, %d, %s, &pout)" n bSize)
+      stmt (printf "LOADBYTES(op, %d, %s, out, &pout)" n bSize)
       skip (show (n))
       next
 
@@ -373,7 +384,7 @@ stubs =
     loadsn  = do
       skip "1"
       stmt ( tmp0 `assign` pop' a ) 
-      stmt (printf "LOADBYTES(op, tmp0, %s, &pout)" bSize)
+      stmt (printf "LOADBYTES(op, tmp0, %s, out, &pout)" bSize)
       skip "tmp0"
       next
 
@@ -381,7 +392,7 @@ stubs =
     rle n = do
       skip "1"
       stmt (tmp0 `assign` decode8) >> skip "1"
-      stmt (printf "RLE(%d, (unsigned char)%s, %s, &pout)" n tmp0 bSize)
+      stmt (printf "RLE(%d, (unsigned char)%s, %s, out, &pout)" n tmp0 bSize)
       next
 
     rlen :: StubM ()
@@ -389,7 +400,7 @@ stubs =
       skip "1"
       stmt (tmp0 `assign` decode8) >> skip "4"
       stmt (tmp1 `assign` pop' a)
-      stmt (printf "RLE(%s, (unsigned char)%s, %s, &pout)" tmp1 tmp0 bSize)
+      stmt (printf "RLE(%s, (unsigned char)%s, %s, out, &pout)" tmp1 tmp0 bSize)
       next
 
     outbyte :: String -> StubM ()

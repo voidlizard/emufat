@@ -9,6 +9,7 @@ import System.Environment
 import System.Process
 import System.IO
 import Data.List
+import Data.Word
 import qualified Data.ByteString.Lazy as BS
 import Data.Binary.Get
 
@@ -203,6 +204,9 @@ testCallRet1 = makeTest $ do
   cnst 0xFFFFFFFF
   outle
 
+--testSer1 = makeTest $ do
+--  ser 0 127 
+
 tests = testSuite $ do
 
   test "testDrop"  testDrop (assert $ getWord32le >>= return . (== 0xAB))
@@ -294,6 +298,22 @@ tests = testSuite $ do
                               c <- getWord32le
                               return $ a == 0xAABBCCDD && b == 0xBABAFACA && c == 0xCAFEBABE
                            )
+
+  test "testSer1"  (makeTest $ ser 0 127) (assert $ do
+                               r <- replicateM 128 getWord32le
+                               return $ r == [0 .. 127]
+                            )
+
+  test "testSer2"  (makeTest $ ser 0 255) (assert $ do
+                               r <- replicateM 128 getWord32le
+                               return $ r == [128 .. 255]
+                            )
+
+  test "testSer3"  (makeTest $ ser 0 0 >> ser 1 1 >> ser 2 2) (assert $ do
+                               r <- replicateM  3 getWord32le
+                               return $ r == [0 .. 2]
+                            )
+
 assert f bs = runGet f bs
 
 
