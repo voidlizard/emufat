@@ -19,7 +19,7 @@ module VMCode (mkVMCode
               ,call ,ret
               ,label
               ,ser, nser, nser128
-              ,loadsn
+              ,loadsn, loads
               ,neq
               ,op0
               ,op1
@@ -238,6 +238,11 @@ rle 512 x = op1 RLE512 (w8 x)
 rle n x =  cnst n >> op1 RLEN (w8 x)
 
 rlen x = op1 RLEN (w8 x)
+
+loads :: [Word8] ->  GenM ()
+loads x = loadsn (BS.pack x)
+
+loadsn bs | BS.length bs == 1 = op1 RLE1 (w8 (BS.head bs))
 
 loadsn bs = do
   forM_ (slice 256 (BS.unpack bs)) $ \xs -> do

@@ -216,6 +216,13 @@ testNSer128 = makeTest $ do
   cnst 3 
   nser128 129 3
 
+testLoads n a = makeTest $ loads (replicate n a) >> cnst 0xCAFEBABE >> outle
+
+checkLoads n a = assert $ do
+  r <- replicateM n getWord8
+  cafe <- getWord32le
+  return $ r == (replicate n a) && cafe == 0xCAFEBABE
+
 tests = testSuite $ do
 
   test "testDrop"  testDrop (assert $ getWord32le >>= return . (== 0xAB))
@@ -329,17 +336,26 @@ tests = testSuite $ do
                               )
 
   test "testNSer2" testNSer2  (assert $ do
-                                 return False
                                  r <- replicateM 128 getWord32le
                                  let a = 129 + (3-3)*128
                                  return $ r == take 128 [a, a+1 ..]
                               )
   test "testNSer128" testNSer128  (assert $ do
-                                 return False
-                                 r <- replicateM 128 getWord32le
-                                 let a = 129 + (3-3)*128
-                                 return $ r == take 128 [a, a+1 ..]
-                              )
+                                     r <- replicateM 128 getWord32le
+                                     let a = 129 + (3-3)*128
+                                     return $ r == take 128 [a, a+1 ..]
+                                  )
+
+  test "testLoads1" (testLoads 1 0xAA) (checkLoads 1 0xAA)
+  test "testLoads2" (testLoads 2 0xBB) (checkLoads 2 0xBB)
+  test "testLoads3" (testLoads 3 0xBB) (checkLoads 3 0xBB)
+  test "testLoads4" (testLoads 4 0xBB) (checkLoads 4 0xBB)
+  test "testLoads5" (testLoads 5 0xBB) (checkLoads 5 0xBB)
+  test "testLoads6" (testLoads 6 0xBB) (checkLoads 6 0xBB)
+  test "testLoads7" (testLoads 7 0xBB) (checkLoads 7 0xBB)
+  test "testLoads8" (testLoads 8 0xBB) (checkLoads 8 0xBB)
+  test "testLoads9" (testLoads 9 0xBB) (checkLoads 9 0xBB)
+  test "testLoads10" (testLoads 10 0xBB) (checkLoads 10 0xBB)
 
   test "testRLE1" (makeTest $ rle 1 0xFF) (assert $ getWord8 >>= return . (==0xFF) )
   test "testRLE2" (makeTest $ rle 2 0xFF) (assert $ replicateM 2 (getWord8) >>=  return . (==(replicate 2 0xFF)))
@@ -382,7 +398,7 @@ runTest path (T{tname=nm, tcode=code, tcheck = tc})= do
   hClose inp
   res <- BS.hGetContents out
   let r = tc res
-  hPutStrLn stderr (printf "test %-24s : %s" nm (if r then "PASSED" else "FAILED"))
+  hPutStrLn stderr (printf "test %-24s : %s" nm (if r then "PASSED" else "FAILED !"))
   return r
 
 withTest :: String -> (Test -> IO Bool) -> IO ()
