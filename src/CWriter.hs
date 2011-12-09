@@ -398,7 +398,7 @@ stubs =
     rlen :: StubM ()
     rlen  = do
       skip "1"
-      stmt (tmp0 `assign` decode8) >> skip "4"
+      stmt (tmp0 `assign` decode8) >> skip "1"
       stmt (tmp1 `assign` pop' a)
       stmt (printf "RLE(%s, (unsigned char)%s, %s, out, &pout)" tmp1 tmp0 bSize)
       next

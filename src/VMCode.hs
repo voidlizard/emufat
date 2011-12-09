@@ -25,7 +25,7 @@ module VMCode (mkVMCode
               ,op1
               ,op2
               ,op3
-              ,rle
+              ,rle, rlen
               ,rng
               ,not_
               ,nop ,debug
@@ -236,6 +236,8 @@ rle 128 x = op1 RLE128 (w8 x)
 rle 256 x = op1 RLE256 (w8 x)
 rle 512 x = op1 RLE512 (w8 x)
 rle n x =  cnst n >> op1 RLEN (w8 x)
+
+rlen x = op1 RLEN (w8 x)
 
 loadsn bs = do
   forM_ (slice 256 (BS.unpack bs)) $ \xs -> do

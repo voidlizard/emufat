@@ -341,6 +341,21 @@ tests = testSuite $ do
                                  return $ r == take 128 [a, a+1 ..]
                               )
 
+  test "testRLE1" (makeTest $ rle 1 0xFF) (assert $ getWord8 >>= return . (==0xFF) )
+  test "testRLE2" (makeTest $ rle 2 0xFF) (assert $ replicateM 2 (getWord8) >>=  return . (==(replicate 2 0xFF)))
+  test "testRLE3" (makeTest $ rle 3 0xFF) (assert $ replicateM 3 (getWord8) >>=  return . (==(replicate 3 0xFF)))
+  test "testRLE4" (makeTest $ rle 4 0xFF) (assert $ replicateM 4 (getWord8) >>=  return . (==(replicate 4 0xFF)))
+  test "testRLE5" (makeTest $ rle 5 0xFF) (assert $ replicateM 5 (getWord8) >>=  return . (==(replicate 5 0xFF)))
+  test "testRLE6" (makeTest $ rle 6 0xFF) (assert $ replicateM 6 (getWord8) >>=  return . (==(replicate 6 0xFF)))
+  test "testRLE7" (makeTest $ rle 7 0xFF) (assert $ replicateM 7 (getWord8) >>=  return . (==(replicate 7 0xFF)))
+  test "testRLE8" (makeTest $ rle 8 0xFF) (assert $ replicateM 8 (getWord8) >>=  return . (==(replicate 8 0xFF)))
+  test "testRLE16" (makeTest $ rle 16 0xFF) (assert $ replicateM 16 (getWord8) >>=  return . (==(replicate 16 0xFF)))
+  test "testRLE32" (makeTest $ rle 32 0xFF) (assert $ replicateM 32 (getWord8) >>=  return . (==(replicate 32 0xFF)))
+  test "testRLE64" (makeTest $ rle 64 0xFF) (assert $ replicateM 64 (getWord8) >>=  return . (==(replicate 64 0xFF)))
+  test "testRLE128" (makeTest $ rle 128 0xFF) (assert $ replicateM 128 (getWord8) >>=  return . (==(replicate 128 0xFF)))
+  test "testRLE512" (makeTest $ rle 512 0xFF) (assert $ replicateM 512 (getWord8) >>=  return . (==(replicate 512 0xFF)))
+  test "testRLEN"  (makeTest $ cnst 384 >> rlen 0xFF) (assert $ replicateM 384 (getWord8) >>=  return . (==(replicate 384 0xFF)))
+
 assert f bs = runGet f bs
 
 
