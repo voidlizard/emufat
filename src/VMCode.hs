@@ -16,6 +16,7 @@ module VMCode (mkVMCode
               ,geq, gt, le, lq
               ,jgq
               ,jmp ,jne ,jnz ,jz
+              ,call ,ret
               ,label
               ,loadsn
               ,neq
@@ -206,6 +207,10 @@ jgq n = tell [CmdCondJmp JGQ (addr n)]
 jnz n = tell [CmdCondJmp JNZ (addr n)]
 jz  n = tell [CmdCondJmp JZ (addr n)]
 jmp n = tell [CmdJmp JMP (addr n)]
+
+call n = tell [Cmd1 CALL (addr' n)]
+ret = op0 RET
+
 label n = tell [CmdLabel n]
 
 block (l, ops) = tell [CmdLabel l] >> tell ops
@@ -260,6 +265,9 @@ op3 x a b c = tell [Cmd3 x a b c]
 
 addr :: Label -> Addr 
 addr l = ALabel l
+
+addr' :: Label -> CmdArg
+addr' l = ADDR (ALabel l)
 
 w8 :: Integral a => a -> CmdArg
 w8 x = W8 (fromIntegral x :: Word8)
@@ -343,6 +351,7 @@ normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
 --            jmap = flip execState M.empty $ mapM_ jmp (concat (map snd bs))
             jmp (CmdJmp _ (ALabel n)) = lookSt n >>= inc n
             jmp (CmdCondJmp _ (ALabel n)) = modify (M.insert n 2)
+            jmp (Cmd1 CALL (ADDR (ALabel n))) = modify (M.insert n 2)
             jmp _ = return ()
             lookSt n = gets (M.lookup n)
             inc n (Nothing) = modify (M.insert n 1)

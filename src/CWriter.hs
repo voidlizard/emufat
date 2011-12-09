@@ -393,7 +393,9 @@ stubs =
       next
 
     outbyte :: String -> StubM ()
-    outbyte s = stmt (printf "*pout++ = (char)(%s)" s)
+    outbyte s = do
+      stmt (printf "*pout++ = (char)(%s)" s)
+      stmt (printf "if(pout >= out + %s) pout = out" bSize)
     
     put = line
     put' = line'

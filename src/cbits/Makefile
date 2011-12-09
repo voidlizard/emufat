@@ -1,14 +1,16 @@
 .DEFAULT: all
 
-all: test
+all: stubs opcodes test
 
-test: opcodes
-	../FatGen stubs > stubs.c
+test:
 	gcc -g ./stubs.c ./teststubs.c -o teststubs
 
-opcodes:
+opcodes: 
 	echo "#ifndef __opcodes_h" > opcodes.h
 	echo "#define __opcodes_h" >> opcodes.h
 	echo "#endif" >> opcodes.h
 	../FatGen opcodes >> opcodes.h
 	echo "" >> opcodes.h
+
+stubs:
+	../FatGen stubs > stubs.c

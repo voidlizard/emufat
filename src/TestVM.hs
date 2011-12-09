@@ -61,7 +61,6 @@ testEq2    = makeTest $ cnst 2 >> cnst 1 >> neq >> outle
 
 testJump1 = makeTest $ do
   l1 <- newLabel
-  l2 <- newLabel
   l3 <- newLabel
 
   jmp l1
@@ -76,7 +75,6 @@ testJump1 = makeTest $ do
   cnst 0xCACAFAFA
   outle
 
---  label l2
   label l1
 
   cnst 0xCAFEBABE
@@ -86,15 +84,12 @@ testJump1 = makeTest $ do
 testJnz1 = makeTest $ do
   l1 <- newLabel
   l2 <- newLabel
-  l3 <- newLabel
-  l4 <- newLabel
 
   cnst 0xDEADBEEF
   dup
   jnz l1
   outle
 
-  label l2
   label l1
 
   cnst 0xCAFEBABE
@@ -102,15 +97,111 @@ testJnz1 = makeTest $ do
 
   cnst 0xFABACADA
   cnst 0
-  jnz l3
+  jnz l2
   outle
   exit
 
-  label l4
-  label l3
+  label l2
   cnst 0xFFFFFFFF
   outle
 
+testJz1 = makeTest $ do
+  l1 <- newLabel
+  l2 <- newLabel
+
+  cnst 0 
+  dup
+  jz l1
+  outle
+
+  label l1
+
+  cnst 0xCAFEBABE
+  outle
+
+  cnst 0xFABACADA
+  cnst 0
+  jz l2
+  outle
+  exit
+
+  label l2
+  cnst 0xFFFFFFFF
+  outle
+
+testJgq = makeTest $ do
+  [l1, l2, l3] <- replicateM 3 newLabel
+
+  cnst 46
+  cnst 25
+  jgq l1
+
+  cnst 0xFFFFFFFF
+  outle
+
+  label l1
+  cnst 0xC0DE600D -- 1
+  outle
+
+  cnst 42
+  cnst 42
+  jgq l2
+  exit
+
+  label l2
+  cnst 0xCAFEBABE -- 2
+  outle
+
+  cnst 25
+  cnst 46
+  jgq  l3
+  exit
+
+  label l3
+  cnst 0xDEADBEEF
+  outle
+
+testJne = makeTest $ do
+  [l1, l2] <- replicateM 2 newLabel
+  
+  cnst 1
+  cnst 2
+  jne l1
+  exit
+
+  label l1
+  cnst 0xCAFEBABE -- 1
+  outle
+
+  cnst 1
+  cnst 1
+  jne l2
+  cnst 0xCAFEBABE -- 2
+  outle
+  exit
+
+  label l2
+  cnst 0xFFFFFFFF
+  outle
+
+testCallRet1 = makeTest $ do
+  l1 <- newLabel
+
+  cnst 0xAABBCCDD -- 1
+  outle
+
+  call l1
+  cnst 0xCAFEBABE -- 3
+  outle
+  exit
+
+  label l1
+  cnst 0xBABAFACA -- 2
+  outle
+  ret
+
+  cnst 0xFFFFFFFF
+  outle
 
 tests = testSuite $ do
 
@@ -179,7 +270,30 @@ tests = testSuite $ do
                                return $ a == 0xCAFEBABE && b == 0xFABACADA
                             )
 
+  test "testJz1"   testJz1 (assert $ do
+                               a <- getWord32le
+                               b <- getWord32le
+                               return $ a == 0xCAFEBABE && b == 0xFFFFFFFF
+                            )
 
+  test "testJgq"   testJgq (assert $ do
+                              a <- getWord32le
+                              b <- getWord32le
+                              return $ a == 0xC0DE600D && b == 0xCAFEBABE
+                           )
+
+  test "testJne"   testJne (assert $ do
+                              a <- getWord32le
+                              b <- getWord32le
+                              return $ a == 0xCAFEBABE && b == 0xCAFEBABE
+                           )
+
+  test "testCallRet1"  testCallRet1 (assert $ do
+                              a <- getWord32le
+                              b <- getWord32le
+                              c <- getWord32le
+                              return $ a == 0xAABBCCDD && b == 0xBABAFACA && c == 0xCAFEBABE
+                           )
 assert f bs = runGet f bs
 
 

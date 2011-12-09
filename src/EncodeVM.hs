@@ -54,9 +54,9 @@ data Addr = ALabel Label | AOffset Int
 
 data Cmd =  Cmd0 Opcode
           | CmdConst Word32
-          | Cmd1 Opcode CmdArg 
+          | Cmd1 Opcode CmdArg
           | Cmd2 Opcode CmdArg CmdArg
-          | Cmd3 Opcode CmdArg CmdArg CmdArg 
+          | Cmd3 Opcode CmdArg CmdArg CmdArg
           | CmdJmp Opcode Addr
           | CmdCondJmp Opcode Addr
           | CmdLabel Label
@@ -146,10 +146,12 @@ toBinary cmds = encodeM (pass3 (pass2 (pass1 cmds)))
 
     blockOff sz (l', c) = tell [(l', sz)] >> return (sz + c)
 
+    repl m x@(Cmd1 CALL (ADDR (ALabel n))) = repl' (M.lookup n m) x
     repl m x@(CmdJmp a (ALabel n)) = repl' (M.lookup n m) x
     repl m x@(CmdCondJmp a (ALabel n)) = repl' (M.lookup n m) x
     repl m x = tell [x]
     
+    repl' (Just n) (Cmd1 CALL x) = tell [Cmd1 CALL (ADDR (AOffset n))]
     repl' (Just n) (CmdJmp op x) = tell [CmdJmp op (AOffset n)]
     repl' (Just n) (CmdCondJmp op x) = tell [CmdCondJmp op (AOffset n)]
     repl' Nothing  x = error $ "BAD LABEL " ++ show x
