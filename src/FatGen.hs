@@ -421,6 +421,10 @@ main = do
 
   let !rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
   let tree = mkCmpTree rules
+
+--  print tree
+--  error "stop"
+
   let vm = mkVMCode tree 
 
   cmd <- getArgs
