@@ -87,7 +87,8 @@ mkVMCode xs = normalize maxl code
     maxl  = snd code'           --  |---- this is shit and hack
     code' = runGen'' (scanT xs >> exit >> subs) (fstBlock) -- FIXME: in fact, it's crap
 
-    fstBlock = (succ.fst) (M.findMax (M.fromList (M.elems seqm)))
+    fstBlock | M.null seqm = 0
+             | otherwise   = (succ.fst) (M.findMax (M.fromList (M.elems seqm)))
     seqm = runEncBS (scanSeq xs)
     scanSeq (GEQ n l r) = scanSeq l >> scanSeq r
     scanSeq (CODE rs) = tell (filter ((>4).BS.length) (seqs rs))

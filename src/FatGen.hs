@@ -111,8 +111,8 @@ fatDataEntries cl e = [entry x | x <- universe e]
 
 entryLen :: ClustSize32 -> Entry -> Int        
 entryLen cl e@(DirRoot _ es)  = fatSizeToClust cl $ fatDirLenB es
-entryLen cl e@(DirDot _)    = 0
-entryLen cl e@(DirDotDot _) = 0
+entryLen cl e@(DirDot _)      = 0
+entryLen cl e@(DirDotDot _)   = 0
 entryLen cl e@(Dir _ n es)    = fatSizeToClust cl $ fatDirLenB es
 entryLen cl e@(File _ n sz _) = fatSizeToClust cl sz
 
@@ -256,14 +256,21 @@ getFAT'' x = execWriter $ do
   tell [0x0FFFFFF8, fatLastCluster32]
   mapM_ (tell . snd) x
 
-genFAT' :: ClustSize32 -> [AllocEntry] -> [(Int, [Word32])]
-genFAT' cl alloc = (snd . runWriter) $ do
+genFAT' :: ClustSize32 -> Int -> [AllocEntry] -> [(Int, [Word32])]
+genFAT' cl freeSpace alloc = (snd . runWriter) $ do
   forM_ alloc $ \(AllocEntry{beginSect=bs, endSect=es}) -> do
     tell [ (bs, (take (clen bs es - 1) [2 + 1 + start bs .. ]) ++ [fatLastCluster32]) ]
+  
+--  tell [ (allocEnd+1, replicate ((freeSpace `div` clsize) `div` 4) 0) ]
+
   where spc  = fatSectPerClust cl
         clen a b = (b - a + 1) `div` spc
         w32 x = fromIntegral x :: Word32
         start bs = fromIntegral (bs `div` spc) :: Word32
+        allocStart = (beginSect . head) alloc
+        allocEnd   = (endSect . last) alloc
+        allocSize  = allocEnd - allocStart + 1
+        clsize = (fromEnum cl) 
 
 encodeFAT :: Int -> ClusterTable -> [Rule]
 encodeFAT from xs = runEncode (eat xs)
@@ -383,7 +390,6 @@ fatGenBoot32 info = addRsvd $ runPut $ do
           where len = fromIntegral $ BS.length bs
                 rst = fromIntegral $ (rsvd' * fatSectLen) - len
 
-
 main = do
 
   let clust = CL_512
@@ -396,34 +402,21 @@ main = do
 
   ct <- getClockTime >>= toCalendarTime
   let gen = generateData (Just ct) clust alloc
-  let !fat1 = getFAT'' $ genFAT' clust alloc
+  let !fat1 = getFAT'' $ genFAT' clust 0 alloc
 
-  let fatStart = 2
+  let fatSize = (length fat1 * 4) `div` fatSectLen
 
-  let !fat  = encodeFAT fatStart fat1
-
---  withFile "fat-test.bin" WriteMode $ flip BS.hPut (runPut $  replicateM_ (fatStart*fatSectLen) (putWord8 0) >>  mapM_ putWord32le fat1)
---  mapM_ print fat 
-
---  error "STOP"
-
-  let adj = rsect $ last fat
-
-  let fat2 = encodeFAT (adj+1) fat1
-  let adj2 = rsect $ last fat2
-  let gen2 = generateData (Just ct) clust (allocate clust (adj2+1) sample) 
-
-  let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (adj - fatStart + 1) Nothing
+  let fatInfo = FAT32GenInfo clust (gigs 2) volId "TEST" (fatSize) Nothing
   let fatBin  = fatGenBoot32 fatInfo
 
---  print (BS.length fatBin)
---  error "stop"
+  let fatStart = fromIntegral (BS.length fatBin) `div` fatSectLen
 
-  let !rules = concat [encodeRaw fatSectLen 0 fatBin] --, fat, fat2, gen2]
+  let fat  = encodeFAT (fatStart) fat1
+  let fat2 = encodeFAT (fatStart + fatSize + 1) fat1
+  let gen2 = generateData (Just ct) clust (allocate clust (fatStart + 2*fatSize + 1) sample)
+
+  let !rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
   let tree = mkCmpTree rules
-
-  print tree
-  error "stop"
 
   let vm = mkVMCode tree 
 
@@ -449,6 +442,9 @@ main = do
     ("rules" : _) -> do
       mapM_ print rules 
 
+    ("alloc" : _) -> do
+      mapM_ print alloc 
+
     _ -> do
       putStrLn "Usage: FatGen bin|asm|stubs|opcodes|rules"
 
@@ -458,6 +454,21 @@ randomW32 = liftM fromIntegral (randomIO :: IO Int)
 
 hex32 :: Word32 -> String
 hex32 x = printf "%08X" (fromIntegral x :: Int) 
+
+
+fatSampleEmpty = filesystem $ do return ()
+--  file "file0" (16384)
+--  dir "A" $ do
+--    file "file1" (megs 100)
+--    dir "C" $ do
+--      file "file3" (megs 100)
+--      file "file4" (megs 100)
+--      file "file5" (megs 100)
+--      dir "E" $ emptyDir 
+--      
+--  dir "B" $ do
+--    file "file2" (megs 50)
+
 
 fatSample2 = filesystem $ do
   file "file0" (16384)

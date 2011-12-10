@@ -22,7 +22,7 @@ fatBytesPerCluster :: FAT -> Int
 fatBytesPerCluster (FAT32 { bytesPerSect = bps, sectPerClust = spc }) = bps*spc
 
 fatLastCluster32 :: Word32
-fatLastCluster32 = 0xFFFFFFFF 
+fatLastCluster32 = 0xFFFFFFFF
 
 fatClusters :: Integral a => ClustSize32 -> a -> a
 fatClusters cl n = ceiling (fromIntegral n / ((fromIntegral . fromEnum) cl))
