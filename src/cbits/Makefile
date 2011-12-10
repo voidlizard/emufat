@@ -3,7 +3,10 @@
 all: stubs opcodes test
 
 test:
-	gcc -g ./stubs.c ./teststubs.c -o teststubs
+	gcc -O2 ./stubs.c ./teststubs.c -o teststubs
+
+genfat: genfat.c
+	gcc -O2 ./stubs.c ./genfat.c -o genfat
 
 opcodes: 
 	echo "#ifndef __opcodes_h" > opcodes.h

@@ -386,9 +386,9 @@ fatGenBoot32 info = addRsvd $ runPut $ do
 
 main = do
 
-  let clust = CL_32K
+  let clust = CL_512
 
-  let sample = fatSample5
+  let sample = fatSample2
   let !alloc = allocate clust 0 sample
 
   newStdGen >>= setStdGen
@@ -419,11 +419,11 @@ main = do
 --  print (BS.length fatBin)
 --  error "stop"
 
-  let !rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
+  let !rules = concat [encodeRaw fatSectLen 0 fatBin] --, fat, fat2, gen2]
   let tree = mkCmpTree rules
 
---  print tree
---  error "stop"
+  print tree
+  error "stop"
 
   let vm = mkVMCode tree 
 
