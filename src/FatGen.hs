@@ -40,14 +40,17 @@ import Util
 
 import FatGenAPI
 
+--helloFile = const $ BS8.pack "HELLO WORLD!!"
+helloFile = const $ BS8.pack "HELLO WORLD!!"
+
 fatSample2 = filesystem $ do
-  file "file0" (16384) emptyFile
+  file "file0" (16384) helloFile 
   dir "A" $ do
-    file "file1" (megs 100) emptyFile
+    file "file1" (megs 100) helloFile 
     dir "C" $ do
-      file "file3" (megs 100) emptyFile
-      file "file4" (megs 100) emptyFile
-      file "file5" (megs 100) emptyFile
+      file "file3" (megs 100) helloFile 
+      file "file4" (megs 100) helloFile 
+      file "file5" (megs 100) helloFile 
       dir "E" $ emptyDir 
       
   dir "B" $ do

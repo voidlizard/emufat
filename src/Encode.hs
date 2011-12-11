@@ -16,6 +16,7 @@ data Chunk = SEQ BS.ByteString
            | RLE Int Word8 
            | SER Word32 Word32
            | NSER Word32 Int Word32 -- base offset step
+           | CALLBACK Word8
            deriving (Eq, Ord)
 
 instance Show Chunk where

@@ -167,6 +167,8 @@ mkVMCode xs = normalize maxl code
     scanC ( RLE 0 w )   = skip
     scanC ( RLE n w)    = rle n (fromIntegral w)
 
+    scanC ( CALLBACK n ) = calln n
+
     scanmC xs = mapM_ scanC xs >> op0 EXIT
 
     subs = mapM_ (\e -> block e >> op0 RET) (M.elems seqm)
