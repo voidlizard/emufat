@@ -35,6 +35,8 @@ fatSectorsOf n = ceiling ((fromIntegral n) / (fromIntegral fatSectLen))
 fatSizeToClust :: Integral a => ClustSize32 -> a -> a
 fatSizeToClust cl n = (fromIntegral (fromEnum cl)) * (fromIntegral $ fatClusters cl n)
 
+fatLenToSect n = fatSectLen * fatSectorsOf n
+
 fatSectPerClust cl = (fromEnum cl) `div` (fatSectLen)
 
 fatAttrB :: [ATTR] -> Word8

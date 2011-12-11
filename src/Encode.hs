@@ -85,7 +85,7 @@ decodeBlock cs = runPut $ mapM_ chunk cs
         chunk _ = undefined
 
 mergeRules :: [Rule] -> [Rule]
-mergeRules r = (snd . runWriter) (eat r)
+mergeRules r = execWriter (eat r)
   where eat (REQ a c : REQ b c' : xs) | a+1 == b && c == c' = eat (RANGE a b c : xs)
         eat (REQ a c : RANGE a' b c' : xs) | a+1  == a' && c == c' = eat (RANGE a b c' : xs)
         eat (RANGE a b c : RANGE a' b' c' : xs) | b+1 == a' && c == c' = eat (RANGE a b' c' : xs)

@@ -272,7 +272,7 @@ generateData ct cl es = mergeRules $ execWriter $ do
 type ClusterTable = BS.ByteString 
 
 genFAT :: ClustSize32 -> Int -> [AllocEntry] -> ClusterTable 
-genFAT cl size alloc = BS.append allocated free 
+genFAT cl size alloc = BS.append allocated free
   where
     allocated = runPut $ do
       mapM_ putWord32le [0x0FFFFFF8, fatLastCluster32]
@@ -280,8 +280,7 @@ genFAT cl size alloc = BS.append allocated free
         mapM_ putWord32le (take (clen bs es - 1) [2 + 1 + start bs .. ])
         putWord32le fatLastCluster32
 
-    free = runPut $ replicateM_ freeNum (putWord32le 0)
-    freeNum = ((size - 4*(fromIntegral (BS.length allocated))) `div` 4)
+    free = BS.replicate ((fromIntegral size) - BS.length allocated) 0
     spc  = fatSectPerClust cl
     clen a b = (b - a + 1) `div` spc
     start bs = fromIntegral (bs `div` spc) :: Word32
@@ -293,7 +292,7 @@ genFAT' cl size alloc = undefined
 encodeFAT :: Int -> ClusterTable -> [Rule]
 encodeFAT from xs = runEncode (eat xs)
   where eat bs | BS.null bs = sector []
-               | otherwise  = let (a, b) = BS.splitAt (fromIntegral (4*fatSectLen)) bs
+               | otherwise  = let (a, b) = BS.splitAt (fromIntegral (fatSectLen)) bs
                                   bn = fromIntegral (BS.length a) `div` 4
                               in sector (runGet (replicateM bn getWord32le) a) >> eat b
 
@@ -415,14 +414,14 @@ fatGenBoot32 info = addRsvd $ runPut $ do
           where len x = fromIntegral $ BS.length x
 
 main = do
-  let clust = CL_4K
+  let clust = CL_512
   let rsvd  = 32
 
   let sample = fatSample2
   let !alloc = allocate clust 0 sample
 
   let dSize = (megs 512)
-  let fatSize = (fatClNum clust dSize) * 4 + 2*4
+  let fatSize = fatLenToSect $ (fatClNum clust dSize) * 4 + 2*4
   let volSize = rsvd*fatSectLen + 2*fatSize + dSize
 
   newStdGen >>= setStdGen
@@ -445,7 +444,7 @@ main = do
   let datasect = (fsect.last) fat2
   let gen2 = generateData (Just ct) clust (allocate clust (datasect + 1) sample)
 
-  let !rules = concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
+  let !rules = mergeRules $ concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
   let tree = mkCmpTree rules
 
   let vm = mkVMCode tree 
