@@ -79,7 +79,7 @@ newLabel = do
   n <- get
   modify succ >> return n
 
---mkVMCode :: CmpTree -> [(Label, [Cmd])]
+mkVMCode :: CmpTree -> [Block]
 mkVMCode xs = normalize maxl code
   where
 

@@ -55,12 +55,13 @@ fatTime ct = s .|. m .|. h
         m = (w16 (ctMin ct) .&. 0x3F) `shiftL` 5
         h = (w16 (ctHour ct) .&. 0x1F) `shiftL` 11
 
+--fatSectLen :: Int
 fatSectLen = 512
 
-fatSectNum :: ClustSize32 -> Int
-fatSectNum cl = fromEnum cl `div` fatSectLen 
+fatSectNum :: ClustSize32 -> Int 
+fatSectNum cl = fromEnum cl `div` (fromIntegral fatSectLen)
 
-fatClNum :: ClustSize32 -> Int -> Int
+fatClNum :: ClustSize32 -> Int -> Int 
 fatClNum cl s = ceiling $ (fromIntegral s) / (fromIntegral $ fromEnum cl)
 
 w16 :: Integral a => a -> Word16
