@@ -41,17 +41,17 @@ import Util
 import FatGenAPI
 
 fatSample2 = filesystem $ do
-  file "file0" (16384)
+  file "file0" (16384) emptyFile
   dir "A" $ do
-    file "file1" (megs 100)
+    file "file1" (megs 100) emptyFile
     dir "C" $ do
-      file "file3" (megs 100)
-      file "file4" (megs 100)
-      file "file5" (megs 100)
+      file "file3" (megs 100) emptyFile
+      file "file4" (megs 100) emptyFile
+      file "file5" (megs 100) emptyFile
       dir "E" $ emptyDir 
       
   dir "B" $ do
-    file "file2" (megs 50)
+    file "file2" (megs 50) emptyFile
 
 fatSample3 = filesystem $ do
   dir "A" $ do
@@ -61,48 +61,48 @@ fatSample3 = filesystem $ do
   dir "D" $ do emptyDir
 
 fatSample4 = filesystem $ do
-  file "file1" (megs 100)
-  file "file2" (megs 100)
-  file "file3" (megs 100)
-  file "file4" (megs 100)
-  file "file5" (megs 100)
-  file "file6" (megs 100)
-  file "file7" (megs 100)
-  file "file8" (megs 100)
-  file "file9" (megs 100)
-  file "file10" (megs 100)
-  file "file11" (megs 100)
-  file "file12" (megs 100)
-  file "file13" (megs 100)
-  file "file14" (megs 100)
-  file "file15" (megs 100)
-  file "file16" (megs 100)
-  file "file17" (megs 100)
-  file "file18" (megs 100)
-  file "file19" (megs 100)
-  file "file20" (megs 100)
+  file "file1" (megs 100) emptyFile
+  file "file2" (megs 100) emptyFile
+  file "file3" (megs 100) emptyFile
+  file "file4" (megs 100) emptyFile
+  file "file5" (megs 100) emptyFile
+  file "file6" (megs 100) emptyFile
+  file "file7" (megs 100) emptyFile
+  file "file8" (megs 100) emptyFile
+  file "file9" (megs 100) emptyFile
+  file "file10" (megs 100) emptyFile
+  file "file11" (megs 100) emptyFile
+  file "file12" (megs 100) emptyFile
+  file "file13" (megs 100) emptyFile
+  file "file14" (megs 100) emptyFile
+  file "file15" (megs 100) emptyFile
+  file "file16" (megs 100) emptyFile
+  file "file17" (megs 100) emptyFile
+  file "file18" (megs 100) emptyFile
+  file "file19" (megs 100) emptyFile
+  file "file20" (megs 100) emptyFile
 
 fatSample5 = filesystem $ do
-  file "file1" (gigs 1)
-  file "file2" (gigs 1)
-  file "file3" (gigs 1)
-  file "file4" (gigs 1)
-  file "file5" (gigs 1)
-  file "file6" (gigs 1)
-  file "file7" (gigs 1)
-  file "file8" (gigs 1)
-  file "file9" (gigs 1)
-  file "file10" (gigs 1)
-  file "file11" (gigs 1)
-  file "file12" (gigs 1)
-  file "file13" (gigs 1)
-  file "file14" (gigs 1)
-  file "file15" (gigs 1)
-  file "file16" (gigs 1)
-  file "file17" (gigs 1)
-  file "file18" (gigs 1)
-  file "file19" (gigs 1)
-  file "file20" (gigs 1)
+  file "file1" (gigs 1) emptyFile
+  file "file2" (gigs 1) emptyFile
+  file "file3" (gigs 1) emptyFile
+  file "file4" (gigs 1) emptyFile
+  file "file5" (gigs 1) emptyFile
+  file "file6" (gigs 1) emptyFile
+  file "file7" (gigs 1) emptyFile
+  file "file8" (gigs 1) emptyFile
+  file "file9" (gigs 1) emptyFile
+  file "file10" (gigs 1) emptyFile
+  file "file11" (gigs 1) emptyFile
+  file "file12" (gigs 1) emptyFile
+  file "file13" (gigs 1) emptyFile
+  file "file14" (gigs 1) emptyFile
+  file "file15" (gigs 1) emptyFile
+  file "file16" (gigs 1) emptyFile
+  file "file17" (gigs 1) emptyFile
+  file "file18" (gigs 1) emptyFile
+  file "file19" (gigs 1) emptyFile
+  file "file20" (gigs 1) emptyFile
 
 main = do
   let cl = CL_4K
