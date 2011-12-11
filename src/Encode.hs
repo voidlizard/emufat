@@ -24,6 +24,7 @@ instance Show Chunk where
   show (RLE a n) = printf "RLE %d %d" a n
   show (SER a b) = printf "SER %d %d" a b
   show (NSER a b c) = printf "NSER %d %d %d" a b c
+  show (CALLBACK n) = printf "CALLBACK %d" n
 
 data CmpTree = GEQ Int CmpTree CmpTree | CODE [Rule]
   deriving (Show)
