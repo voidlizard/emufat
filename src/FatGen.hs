@@ -125,7 +125,7 @@ fatMaxFileLen es = S.findMax $ S.fromList $ map snd es
 
 type FATWriterM = Writer [Rule] -- FATWriterT []
 
-runFATWriter f = snd $ runWriter f
+runFATWriter f = execWriter f
 
 data AllocEntry = AllocEntry { beginSect :: Int
                              , endSect   :: Int
@@ -213,8 +213,58 @@ validFATNameASCII s = up $ take 11 $ reverse $ compl 11 $ foldl' chr "" s
 compl n s = replicate (n - length s) ' ' ++ s
 
 generateData :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
-generateData ct cl es = mergeRules $ runFATWriter $ do
-  forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) ->
+generateData ct cl es = mergeRules $ execWriter $ do
+  trace (intercalate "\n" (map show (M.toList clMap))) $ return ()
+  forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) -> do
+    case e of
+      DirRoot _ es  -> writeEntries bsect esect es
+      Dir _ _ es    -> writeEntries bsect esect es
+      File _ _ _ sz -> tell [RANGE bsect esect [RLE fatSectLen 0xFF]]
+  where
+
+      clMap = M.fromList (map ent es)
+      ent (AllocEntry{beginSect=bs, entry=(DirRoot eid _)})  = (eid, clustN bs)
+      ent (AllocEntry{beginSect=bs, entry=(Dir eid _ _)})    = (eid, clustN bs)
+      ent (AllocEntry{beginSect=bs, entry=(DirDot eid)})     = (eid, clustN bs)
+      ent (AllocEntry{beginSect=bs, entry=(DirDotDot eid)})  = (eid, clustN bs)
+      ent (AllocEntry{beginSect=bs, entry=(File eid _ _ _)}) = (eid, clustN bs)
+
+      clOf (DirRoot eid _) = getCl eid
+      clOf (Dir eid _ _) = getCl eid
+      clOf (DirDot eid)  = getCl eid
+      clOf (DirDotDot eid) = getCl eid 
+      clOf (File eid _ _ _) = getCl eid
+
+      getCl n = fromJust (M.lookup n clMap)
+
+      firstSect = (beginSect . head) es
+      clustN s = (s - firstSect) `div` (fatSectPerClust cl) + 2
+ 
+      writeEntries bsect esect =
+        encode bsect esect . BS.concat . map (\e -> writeEntry ct (clOf e) e)
+
+      encode b e bs | b == e    = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
+                    | otherwise = encodeSect b e (rest bs b e (bslen bs))
+
+      encodeSect b e bs = eatSect b bs
+        where
+          eatSect from bs | bslen' bs == fsl = tell [REQ from (encodeBlock bs)]
+                          | bslen' bs < fsl  = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
+                          | otherwise = tell [REQ from (encodeBlock (BS.take fsl bs))]
+                                        >> eatSect (from+1) (BS.drop fsl bs)
+          fsl = fromIntegral fatSectLen
+
+      rest bs a b l =
+        let rs = (b - a + 1) * fatSectLen - l
+        in if rs > 0 then BS.append bs (BS.replicate (fromIntegral rs) 0x00) else bs
+
+      bslen' = BS.length
+      bslen = fromIntegral . BS.length
+
+generateData' :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
+generateData' ct cl es = mergeRules $ runFATWriter $ do
+  forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) -> do
+--    trace ("entry " ++ show bsect ++ " " ++ show esect) $ return ()
     case e of
       DirRoot _ es  -> writeEntries bsect esect es
       Dir _ _ es    -> writeEntries bsect esect es
@@ -224,7 +274,7 @@ generateData ct cl es = mergeRules $ runFATWriter $ do
         clustOf (DirDot fid) bsect = clustOf'' fid bsect
         clustOf (DirDotDot fid) bsect = clustOf'' fid bsect
         clustOf _ n = clustOf' n
-        clustOf' n = n `mod` fatSectPerClust cl
+        clustOf' n = n `div` fatSectPerClust cl
         clustOf'' fid bsect = clustOf' (maybe bsect id (M.lookup fid allocMap))
         encode b e bs | b == e    = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
                       | otherwise = encodeSect b e (rest bs b e (bslen bs))

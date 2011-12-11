@@ -216,6 +216,9 @@ testNSer128 = makeTest $ do
   cnst 3 
   nser128 129 3
 
+testLoadsN = makeTest $ do
+  loadsn' 17 >> replicateM_ 17 (byte 0xCC) >> cnst 0xCAFEBABE >> outle
+
 testLoads n a = makeTest $ loads (replicate n a) >> cnst 0xCAFEBABE >> outle
 
 checkLoads n a = assert $ do
@@ -234,7 +237,7 @@ tests = testSuite $ do
   test "testOutBe" testOutBe (assert $ getWord32be >>= return . (== 0xDEADF00D))
   test "testOutB"  testOutB (assert $ getWord8 >>= return . (==0xDD))
   test "testEq1"   testEq1  (assert $ getWord32le >>= return . (== 1))
-  test "testEq2"   testEq2  (assert $ getWord32le >>= return . (== 1))
+  test "testEq3"   testEq2  (assert $ getWord32le >>= return . (== 1))
   test "testNeq1" (makeTest $ cnst 1 >> cnst 1 >> neq >> outle) (assert $ getWord32le >>= return . (== 0))
   test "testNeq2" (makeTest $ cnst 42 >> cnst 24 >> neq >> outle) (assert $ getWord32le >>= return . (== 1))
   test "testGt1"  (makeTest $ cnst 42 >> cnst 24 >> gt >> outle) (assert $ getWord32le >>= return . (== 1))
@@ -356,6 +359,8 @@ tests = testSuite $ do
   test "testLoads8" (testLoads 8 0xBB) (checkLoads 8 0xBB)
   test "testLoads9" (testLoads 9 0xBB) (checkLoads 9 0xBB)
   test "testLoads10" (testLoads 10 0xBB) (checkLoads 10 0xBB)
+
+  test "testLoadsN" (testLoadsN) (checkLoads 17 0xCC)
 
   test "testRLE1" (makeTest $ rle 1 0xFF) (assert $ getWord8 >>= return . (==0xFF) )
   test "testRLE2" (makeTest $ rle 2 0xFF) (assert $ replicateM 2 (getWord8) >>=  return . (==(replicate 2 0xFF)))

@@ -19,7 +19,7 @@ module VMCode (mkVMCode
               ,call ,ret
               ,label
               ,ser, nser, nser128
-              ,loadsn, loads
+              ,loadsn, loads, loadsn', loads'
               ,neq
               ,op0
               ,op1
@@ -240,6 +240,20 @@ rle n x =  cnst n >> op1 RLEN (w8 x)
 
 rlen x = op1 RLEN (w8 x)
 
+loads' :: Int -> GenM ()
+loads' 1  = error "BAD OPCODE: loads1"
+loads' 2  = op0 LOADS2
+loads' 3  = op0 LOADS3 
+loads' 4  = op0 LOADS4 
+loads' 5  = op0 LOADS5 
+loads' 6  = op0 LOADS6 
+loads' 7  = op0 LOADS7 
+loads' 8  = op0 LOADS8
+loads' 9  = op0 LOADS9
+loads' 10 = op0 LOADS10
+
+loadsn' x = op1 LOADSN (w8 x)
+
 loads :: [Word8] ->  GenM ()
 loads x = loadsn (BS.pack x)
 
@@ -257,7 +271,7 @@ loadsn bs = do
       8 -> op0 LOADS8
       9 -> op0 LOADS9
       10 -> op0 LOADS10
-      _ -> op1 LOADSN bl8 
+      _ -> op1 LOADSN bl8
     mapM_ byte xs
     where bl = (BS.length bs)
           bl8 = w8 bl

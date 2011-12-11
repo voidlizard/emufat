@@ -2,13 +2,13 @@
 
 all: stubs opcodes test
 
-test:
-	gcc -O2 ./stubs.c ./teststubs.c -o teststubs
+test: stubs.c teststubs.c opcodes.h
+	gcc -g ./stubs.c ./teststubs.c -o teststubs
 
-genfat: genfat.c
+genfat: genfat.c stubs.c opcodes.h
 	gcc -O2 ./stubs.c ./genfat.c -o genfat
 
-opcodes: 
+opcodes:
 	echo "#ifndef __opcodes_h" > opcodes.h
 	echo "#define __opcodes_h" >> opcodes.h
 	echo "#endif" >> opcodes.h

@@ -222,7 +222,7 @@ stubs =
     decode (LOADS8)  = loads 8
     decode (LOADS9)  = loads 9
     decode (LOADS10) = loads 10
-    decode (LOADSN)  = loadsn  >> next
+    decode (LOADSN)  = loadsn
 
     decode (SER)     = do
       skip "1"
@@ -383,7 +383,7 @@ stubs =
     loadsn :: StubM ()
     loadsn  = do
       skip "1"
-      stmt ( tmp0 `assign` pop' a ) 
+      stmt ( tmp0 `assign` decode8 ) >> skip "1"
       stmt (printf "LOADBYTES(op, tmp0, %s, out, &pout)" bSize)
       skip "tmp0"
       next
