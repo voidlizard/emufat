@@ -41,70 +41,6 @@ import Util
 
 import FatGenAPI
 
-
-main = do
-  let cl = CL_512
-  let rsvd  = 32
-  let sample = fatSample2
-  let dSize = (megs 512)
-
-  newStdGen >>= setStdGen
-  volId <- randomW32 
-  ct <- getClockTime >>= toCalendarTime
-
-  let fSize = fatSize cl dSize
-  let fat1 = genFileAllocTableRaw cl dSize sample 
-  let volSize = calcVolSize rsvd cl dSize
-  let fatInfo = FAT32GenInfo cl volSize volId "TEST" (fatSectorsOf fSize) (Just rsvd)
-  let rules = genFATRules fatInfo fat1 ct sample
-  let vm = compileRules rules
-
-  cmd <- getArgs
-
-  case cmd of
-    ("asm" : _) -> do
-      forM_ vm $ \(l, cmds) -> do
-        printf "%-5s\n" ("L" ++ show l ++ ":")
-        mapM_ print cmds
-
-    ("bin" : _ ) -> do
-      let binary = toBinary vm
-      BS.hPut stdout binary
-
-    ("stubs" : _ ) -> do
-      putStrLn stubs
-
-    ("opcodes" : _) -> do
-      let ops = envFile opcodes
-      putStrLn ops
-
-    ("rules" : _) -> do
-      mapM_ print rules 
-
-    ("alloc" : _) -> do
-      let alloc = allocate cl 0 sample
-      mapM_ print alloc
-
-    ("fat" : _) -> do
-        BS.hPut stdout fat1
-        hFlush stdout
-
-    ("stats" : _) -> do
-        putStrLn $ printf "FAT SIZE: %s (%s)" (show fSize) (show (fatSectorsOf fSize))
-        putStrLn $ printf "VOL SIZE: %d " volSize
-
-    _ -> do
-      putStrLn "Usage: FatGen bin|asm|stubs|opcodes|rules|stats"
-
-
-randomW32 :: IO Word32
-randomW32 = liftM fromIntegral (randomIO :: IO Int)
-
-hex32 :: Word32 -> String
-hex32 x = printf "%08X" (fromIntegral x :: Int) 
-
-fatSampleEmpty = filesystem $ do return ()
-
 fatSample2 = filesystem $ do
   file "file0" (16384)
   dir "A" $ do
@@ -169,4 +105,68 @@ fatSample5 = filesystem $ do
   file "file18" (gigs 1)
   file "file19" (gigs 1)
   file "file20" (gigs 1)
+
+main = do
+  let cl = CL_512
+  let rsvd  = 32
+  let sample = fatSample2
+  let dSize = (megs 512)
+
+  newStdGen >>= setStdGen
+  volId <- randomW32 
+  ct <- getClockTime >>= toCalendarTime
+
+  let fSize = fatSize cl dSize
+  let fat1 = genFileAllocTableRaw cl dSize sample 
+  let volSize = calcVolSize rsvd cl dSize
+  let fatInfo = FAT32GenInfo cl volSize volId "TEST" (fatSectorsOf fSize) (Just rsvd)
+  let rules = genFATRules fatInfo fat1 ct sample
+  let vm = compileRules rules
+
+  cmd <- getArgs
+
+  case cmd of
+    ("asm" : _) -> do
+      forM_ vm $ \(l, cmds) -> do
+        printf "%-5s\n" ("L" ++ show l ++ ":")
+        mapM_ print cmds
+
+    ("bin" : _ ) -> do
+      let binary = toBinary vm
+      BS.hPut stdout binary
+
+    ("stubs" : _ ) -> do
+      putStrLn stubs
+
+    ("opcodes" : _) -> do
+      let ops = envFile opcodes
+      putStrLn ops
+
+    ("rules" : _) -> do
+      mapM_ print rules 
+
+    ("alloc" : _) -> do
+      let alloc = allocate cl 0 sample
+      mapM_ print alloc
+
+    ("fat" : _) -> do
+        BS.hPut stdout fat1
+        hFlush stdout
+
+    ("stats" : _) -> do
+        putStrLn $ printf "FAT SIZE: %s (%s)" (show fSize) (show (fatSectorsOf fSize))
+        putStrLn $ printf "VOL SIZE: %d " volSize
+
+    _ -> do
+      putStrLn "Usage: FatGen bin|asm|stubs|opcodes|rules|stats"
+
+
+randomW32 :: IO Word32
+randomW32 = liftM fromIntegral (randomIO :: IO Int)
+
+hex32 :: Word32 -> String
+hex32 x = printf "%08X" (fromIntegral x :: Int) 
+
+fatSampleEmpty = filesystem $ do return ()
+
 
