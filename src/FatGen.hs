@@ -214,7 +214,9 @@ compl n s = replicate (n - length s) ' ' ++ s
 
 generateData :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
 generateData ct cl es = mergeRules $ execWriter $ do
-  trace (intercalate "\n" (map show (M.toList clMap))) $ return ()
+--  trace (intercalate "\n" (map show es)) $ return ()
+--  trace (intercalate "\n" (map show (M.toList clMap))) $ return ()
+--  trace ("ROOT " ++ show rootId) $ return ()
   forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) -> do
     case e of
       DirRoot _ es  -> writeEntries bsect esect es
@@ -222,17 +224,24 @@ generateData ct cl es = mergeRules $ execWriter $ do
       File _ _ _ sz -> tell [RANGE bsect esect [RLE fatSectLen 0xFF]]
   where
 
+      root@(DirRoot i _) = (entry.fromJust)(find isRoot es)
+      rootId = case root of
+        (DirRoot i _) -> i
+        _             -> error "assertion failed"
+      isRoot (AllocEntry{entry = (DirRoot _ _)}) = True
+      isRoot _ = False
+
       clMap = M.fromList (map ent es)
       ent (AllocEntry{beginSect=bs, entry=(DirRoot eid _)})  = (eid, clustN bs)
       ent (AllocEntry{beginSect=bs, entry=(Dir eid _ _)})    = (eid, clustN bs)
-      ent (AllocEntry{beginSect=bs, entry=(DirDot eid)})     = (eid, clustN bs)
-      ent (AllocEntry{beginSect=bs, entry=(DirDotDot eid)})  = (eid, clustN bs)
       ent (AllocEntry{beginSect=bs, entry=(File eid _ _ _)}) = (eid, clustN bs)
+      ent _ = error "assertion failed"
 
       clOf (DirRoot eid _) = getCl eid
       clOf (Dir eid _ _) = getCl eid
       clOf (DirDot eid)  = getCl eid
-      clOf (DirDotDot eid) = getCl eid 
+      clOf (DirDotDot eid) | eid == rootId = 0
+                           | otherwise = getCl eid
       clOf (File eid _ _ _) = getCl eid
 
       getCl n = fromJust (M.lookup n clMap)
@@ -242,6 +251,7 @@ generateData ct cl es = mergeRules $ execWriter $ do
  
       writeEntries bsect esect =
         encode bsect esect . BS.concat . map (\e -> writeEntry ct (clOf e) e)
+--        encode bsect esect . BS.concat . map (\e -> trace ("ENTRY " ++ show e ++ " " ++ show (clOf e)) $ writeEntry ct (clOf e) e)
 
       encode b e bs | b == e    = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
                     | otherwise = encodeSect b e (rest bs b e (bslen bs))
