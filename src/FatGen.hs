@@ -214,9 +214,6 @@ compl n s = replicate (n - length s) ' ' ++ s
 
 generateData :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
 generateData ct cl es = mergeRules $ execWriter $ do
---  trace (intercalate "\n" (map show es)) $ return ()
---  trace (intercalate "\n" (map show (M.toList clMap))) $ return ()
---  trace ("ROOT " ++ show rootId) $ return ()
   forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) -> do
     case e of
       DirRoot _ es  -> writeEntries bsect esect es
@@ -270,44 +267,6 @@ generateData ct cl es = mergeRules $ execWriter $ do
 
       bslen' = BS.length
       bslen = fromIntegral . BS.length
-
-generateData' :: Maybe CalendarTime -> ClustSize32 -> [AllocEntry] -> [Rule]
-generateData' ct cl es = mergeRules $ runFATWriter $ do
-  forM_ es $ \(AllocEntry {beginSect = bsect, endSect = esect, entry = e}) -> do
---    trace ("entry " ++ show bsect ++ " " ++ show esect) $ return ()
-    case e of
-      DirRoot _ es  -> writeEntries bsect esect es
-      Dir _ _ es    -> writeEntries bsect esect es
-      File _ _ _ sz -> tell [RANGE bsect esect [RLE fatSectLen 0xFF]]
-  where writeEntries bsect esect =
-          encode bsect esect . BS.concat . map (\e -> writeEntry ct (clustOf e bsect) e)
-        clustOf (DirDot fid) bsect = clustOf'' fid bsect
-        clustOf (DirDotDot fid) bsect = clustOf'' fid bsect
-        clustOf _ n = clustOf' n
-        clustOf' n = n `div` fatSectPerClust cl
-        clustOf'' fid bsect = clustOf' (maybe bsect id (M.lookup fid allocMap))
-        encode b e bs | b == e    = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
-                      | otherwise = encodeSect b e (rest bs b e (bslen bs))
-
-        encodeSect b e bs = eatSect b bs
-          where
-            eatSect from bs | bslen' bs == fsl = tell [REQ from (encodeBlock bs)]
-                            | bslen' bs < fsl  = tell [REQ b (encodeBlock (rest bs b e (bslen bs)))]
-                            | otherwise = tell [REQ from (encodeBlock (BS.take fsl bs))]
-                                          >> eatSect (from+1) (BS.drop fsl bs)
-            fsl = fromIntegral fatSectLen
-
-        rest bs a b l =
-          let rs = (b - a + 1) * fatSectLen - l
-          in if rs > 0 then BS.append bs (BS.replicate (fromIntegral rs) 0x00) else bs
-
-        allocMap = M.fromList $ catMaybes (map pairOf es)
-        pairOf (AllocEntry{beginSect=bs, entry=DirDot n}) = Just (n, bs)
-        pairOf (AllocEntry{beginSect=bs, entry=DirDotDot n}) = Just (n, bs)
-        pairOf _ = Nothing
-        
-        bslen' = BS.length
-        bslen = fromIntegral . BS.length
 
 type ClusterTable = [Word32] 
 
@@ -452,11 +411,8 @@ fatGenBoot32 info = addRsvd $ runPut $ do
                        replicateM_ (fatSectLen*6 - (len bs)) (putWord8 0)
                        putLazyByteString bs
                        replicateM_ ((rsvd' * fatSectLen) - (2*(len bs) + fatSectLen*6 - (len bs))) (putWord8 0)
---                       replicateM_ (512) (putWord8 0)
---                       replicateM_ ((rsvd' * fatSectLen) -   len bs) (putWord8 0xAA)
 
           where len x = fromIntegral $ BS.length x
---                rst = fromIntegral $ (rsvd' * fatSectLen) - len
 
 main = do
   let clust = CL_4K
@@ -475,8 +431,6 @@ main = do
   ct <- getClockTime >>= toCalendarTime
   let gen = generateData (Just ct) clust alloc
   let !fat1 = genFAT clust fatSize alloc
-
---  error (show fatSize)
 
   let fatInfo = FAT32GenInfo clust volSize volId "TEST" (fatSectorsOf fatSize) (Just rsvd)
   let fatBin  = fatGenBoot32 fatInfo
@@ -527,17 +481,8 @@ main = do
         putStrLn $ printf "FAT SIZE: %s (%s)" (show fatSize) (show (fatSectorsOf fatSize))
         putStrLn $ printf "VOL SIZE: %d " volSize
 
---        BS.hPut stdout (runPut $ mapM_ putWord32le fat1)
---        hFlush stdout
-
-
---     let pieces = slice 4 fat1
---     forM_ pieces $ \p -> do
---        
---        putStrLn $ intercalate " " $ map (printf "%08X") p
-
     _ -> do
-      putStrLn "Usage: FatGen bin|asm|stubs|opcodes|rules"
+      putStrLn "Usage: FatGen bin|asm|stubs|opcodes|rules|stats"
 
 
 randomW32 :: IO Word32
@@ -546,20 +491,7 @@ randomW32 = liftM fromIntegral (randomIO :: IO Int)
 hex32 :: Word32 -> String
 hex32 x = printf "%08X" (fromIntegral x :: Int) 
 
-
 fatSampleEmpty = filesystem $ do return ()
---  file "file0" (16384)
---  dir "A" $ do
---    file "file1" (megs 100)
---    dir "C" $ do
---      file "file3" (megs 100)
---      file "file4" (megs 100)
---      file "file5" (megs 100)
---      dir "E" $ emptyDir 
---      
---  dir "B" $ do
---    file "file2" (megs 50)
-
 
 fatSample2 = filesystem $ do
   file "file0" (16384)
