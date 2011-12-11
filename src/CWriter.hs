@@ -19,6 +19,7 @@ stubs =
   envFile $ do
     comment "top of the file"
     put "#include <stdint.h>"
+    put "#include \"emufatstubs.h\""
     defines
     put $ "#define DECODE32(op) (((uint32_t)(*((op)+0)<<24))|((uint32_t)(*((op)+1)<<16))|((uint32_t)(*((op)+2)<<8))|((uint32_t)(*((op)+3))))"
     put $ "#define DECODE8(op)  (*(op))"
@@ -66,7 +67,7 @@ stubs =
       stmt $ "*out = p"
 
     endl
-    envFunc "int runDecode" [(stackCellType, "n"), (pt codeType, "code"), ("const int", bSize), ((pt outType, "out"))] $ do
+    envFunc "int runDecode" [(stackCellType, "n"), (pt codeType, "code"), ("const int", bSize), ((pt outType, "out")), ("emufat_cb*", "cb")] $ do
       indented $ do
         stmt (printf "DEFSTACK(a, %s, 16)" stackCellType)
         stmt (printf "DEFSTACK(r, %s, 8)" stackCellType)
@@ -193,6 +194,13 @@ stubs =
       stmt (tmp0 `assign` decode32) >> skip "4"
       stmt (push' r pc')
       jump tmp0
+
+    decode (CALLN)    = do
+      skip "1"
+      stmt (tmp0 `assign` decode8) >> skip "1"
+      _if1  (printf "cb && cb[%s].fn" tmp0 :: String) $ do
+        stmt (printf "cb[%s].fn(cb[%s].clos, out)" tmp0 tmp0)
+      next
 
     decode (RET)     = jump (pop' r)
 
@@ -357,6 +365,7 @@ stubs =
     _and :: String -> String -> String
     _and a b = printf "(%s && %s)" a b
 
+--    _if1 :: String -> StubM ()
     _if1 s f = do
       put (printf "if(%s)" s)
       braces $ indented $ f

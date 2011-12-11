@@ -11,6 +11,7 @@ import System.IO
 import Data.List
 import Data.Word
 import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy.Char8 as C8
 import Data.Binary.Get
 
 import Debug.Trace
@@ -226,6 +227,18 @@ checkLoads n a = assert $ do
   cafe <- getWord32le
   return $ r == (replicate n a) && cafe == 0xCAFEBABE
 
+testCb0 = makeTest $ do
+  rle 32 0xFF
+  calln 0
+  exit
+
+testCb1 = makeTest $ do
+  rle 32 0xFF
+  calln 1
+  exit
+
+helloworld = C8.pack "HELLO WORLD"
+
 tests = testSuite $ do
 
   test "testDrop"  testDrop (assert $ getWord32le >>= return . (== 0xAB))
@@ -376,6 +389,9 @@ tests = testSuite $ do
   test "testRLE128" (makeTest $ rle 128 0xFF) (assert $ replicateM 128 (getWord8) >>=  return . (==(replicate 128 0xFF)))
   test "testRLE512" (makeTest $ rle 512 0xFF) (assert $ replicateM 512 (getWord8) >>=  return . (==(replicate 512 0xFF)))
   test "testRLEN"  (makeTest $ cnst 384 >> rlen 0xFF) (assert $ replicateM 384 (getWord8) >>=  return . (==(replicate 384 0xFF)))
+
+  test "testCb0"  testCb0 (assert $ replicateM 32 (getWord8) >>=  return . (==(replicate 32 0xFF)))
+  test "testCb1"  testCb1 (assert $ getLazyByteString (BS.length helloworld) >>= return . (== helloworld) )
 
 assert f bs = runGet f bs
 

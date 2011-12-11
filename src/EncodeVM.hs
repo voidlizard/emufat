@@ -31,6 +31,7 @@ data Opcode =  DUP | DROP
              | RLE16 | RLE32 | RLE64 | RLE128 | RLE256 | RLE512 | RLEN
              | OUTLE | OUTBE | OUTB
              | NOP
+             | CALLN
              | DEBUG
              | EXIT
   deriving (Eq, Ord, Enum, Show)
@@ -42,7 +43,7 @@ instance OpcodeCL Opcode where
   arity0 x = 
     x `elem` ([DUP, DROP] ++ [NOT .. RNG] ++ [CALLT, RET, NOP, DEBUG, EXIT] ++ [LOADS2 .. LOADS10] ++ [OUTLE .. OUTB])
 
-  arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN] ++ [CALL])
+  arity1 x = x `elem` ([CONST] ++ [JNZ .. JMP] ++ [LOADSN] ++ [RLE1 .. RLEN] ++ [CALL] ++ [CALLN])
   arity2 x = x `elem` ([SER, NSER128, CRNG])
   arity3 x = x `elem` ([NSER])
   firstCode = DUP
@@ -112,6 +113,8 @@ toBinary cmds = encodeM (pass3 (pass2 (pass1 cmds)))
 
     encode (Cmd0 x)     = putOpcode x 
     encode (CmdConst x) = putOpcode CONST >> putWord32be x
+
+    encode (Cmd1 CALLN a) = putOpcode CALLN >> putArg8 a
 
     encode (Cmd1 LOADSN a) | (unArg a) < 256 = putOpcode LOADSN >> putArg8 a
                            | otherwise = error $ "BAD LOADSN ARG" ++ show a

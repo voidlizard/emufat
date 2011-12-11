@@ -53,7 +53,6 @@ fatSample2 = filesystem $ do
   dir "B" $ do
     file "file2" (megs 50)
 
-
 fatSample3 = filesystem $ do
   dir "A" $ do
     dir "B" $ do

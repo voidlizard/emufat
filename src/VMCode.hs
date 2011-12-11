@@ -16,7 +16,7 @@ module VMCode (mkVMCode
               ,geq, gt, le, lq
               ,jgq
               ,jmp ,jne ,jnz ,jz
-              ,call ,ret
+              ,call ,ret ,calln
               ,label
               ,ser, nser, nser128
               ,loadsn, loads, loadsn', loads'
@@ -213,6 +213,8 @@ jgq n = tell [CmdCondJmp JGQ (addr n)]
 jnz n = tell [CmdCondJmp JNZ (addr n)]
 jz  n = tell [CmdCondJmp JZ (addr n)]
 jmp n = tell [CmdJmp JMP (addr n)]
+
+calln n = op1 CALLN (w8 n)
 
 call n = tell [Cmd1 CALL (addr' n)]
 ret = op0 RET
