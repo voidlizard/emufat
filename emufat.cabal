@@ -1,0 +1,46 @@
+name:                emufat
+version:             0.9
+synopsis:            FAT emulation toolkit 
+description:         N/A
+category:            Codec
+license:             AllRightsReserved
+license-file:        LICENSE
+author:              Dmitry Zuikov 
+maintainer:          dzuikov@gmail.com 
+
+cabal-version:       >= 1.6
+build-type:          Simple 
+
+executable  FatGen 
+    main-is:             FatGen.hs
+    hs-source-dirs:	     src    
+
+    build-depends:       base >= 4.0
+                         ,haskell98
+                         ,ghc-binary
+                         ,mtl >= 2.0.0.0
+                         ,bytestring >= 0.9.0.0
+                         ,transformers >= 0.2.2.0
+                         ,containers   >= 0.4.0.0
+                         ,old-time
+                         ,uniplate
+
+    ghc-options:         -O2
+
+executable TestVM 
+    main-is:             TestVM.hs
+    hs-source-dirs:	     src
+
+    build-depends:       base >= 4.0
+                         ,haskell98
+                         ,ghc-binary
+                         ,mtl >= 2.0.0.0
+                         ,bytestring >= 0.9.0.0
+                         ,transformers >= 0.2.2.0
+                         ,containers   >= 0.4.0.0 
+                         ,old-time
+                         ,uniplate
+                         ,process
+
+    ghc-options:         -O2
+

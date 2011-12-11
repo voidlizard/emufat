@@ -1,0 +1,16 @@
+*.o
+*.hi
+*.swp
+./FatGen
+./TestVM
+./dist
+./cabal-dev
+./cbits/genfat 
+./cbits/opcodes.h 
+./cbits/teststubs
+cbits/stubs.c
+dist
+cabal-dev
+cbits/teststubs
+cbits/genfat
+cbits/opcodes.h

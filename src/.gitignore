@@ -1,5 +1,0 @@
-CWriter.hi Encode.hi EncodeVM.hi FatGen.hi FAT.hi FsEncode.hi ReadFAT.hi TestVM.hi Util.hi VMCode.hi CWriter.o Encode.o EncodeVM.o FatGen.o FAT.o FsEncode.o ReadFAT.o TestVM.o Util.o VMCode.o
-cbits/stubs.c
-CWriter.o Encode.o EncodeVM.o FatGen.o FAT.o FsEncode.o ReadFAT.o TestVM.o Util.o VMCode.o
-*.o
-*.hi
