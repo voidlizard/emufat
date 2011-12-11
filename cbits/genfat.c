@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "emufatstubs.h"
 #include "opcodes.h"
 
 void _emufat_decode_debug(uint32_t *a, uint32_t *atop, uint32_t *r, uint32_t *rtop, char *outp, char *out) {
@@ -11,7 +12,7 @@ void _emufat_decode_debug(uint32_t *a, uint32_t *atop, uint32_t *r, uint32_t *rt
     fprintf(stderr, "A: %08X\n", *atop);
 }
 
-int runDecode(uint32_t n, uint8_t * code, const int bsize, char * out);
+int runDecode(uint32_t n, uint8_t * code, const int bsize, char * out, emufat_cb cb[256]);
 
 void dump(const int len, char *buf) {
     int i = 0, j = 0;
@@ -27,6 +28,8 @@ void dump(const int len, char *buf) {
 #define SECTOR 512
 
 static uint8_t opcodes[MAXOPCODES] = { EXIT };
+
+static emufat_cb cb[256] = { { .fn = 0, .clos = 0} };
 
 int main(int argc, char **argv) {
     const int blen = SECTOR;
@@ -46,7 +49,7 @@ int main(int argc, char **argv) {
         time_t dt = 0;
         uint32_t kbs = 0;
        
-        runDecode(i, opcodes, blen, buf);
+        runDecode(i, opcodes, blen, buf, 0);
         fwrite(buf, 1, blen, stdout);
         
         dt = time(0) - t0;
