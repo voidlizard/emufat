@@ -22,12 +22,15 @@ fatBytesPerCluster :: FAT -> Int
 fatBytesPerCluster (FAT32 { bytesPerSect = bps, sectPerClust = spc }) = bps*spc
 
 fatLastCluster32 :: Word32
-fatLastCluster32 = 0xFFFFFFFF
+fatLastCluster32 = 0x0FFFFFFF
 
 fatClusters :: Integral a => ClustSize32 -> a -> a
 fatClusters cl n = ceiling (fromIntegral n / ((fromIntegral . fromEnum) cl))
 
 fatSizeToSect = fatClusters
+
+fatSectorsOf :: Int -> Int
+fatSectorsOf n = ceiling ((fromIntegral n) / (fromIntegral fatSectLen))
 
 fatSizeToClust :: Integral a => ClustSize32 -> a -> a
 fatSizeToClust cl n = (fromIntegral (fromEnum cl)) * (fromIntegral $ fatClusters cl n)
@@ -54,6 +57,9 @@ fatSectLen = 512
 
 fatSectNum :: ClustSize32 -> Int
 fatSectNum cl = fromEnum cl `div` fatSectLen 
+
+fatClNum :: ClustSize32 -> Int -> Int
+fatClNum cl s = ceiling $ (fromIntegral s) / (fromIntegral $ fromEnum cl)
 
 w16 :: Integral a => a -> Word16
 w16 = fromIntegral
