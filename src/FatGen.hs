@@ -29,6 +29,7 @@ import Data.Data
 import Data.Typeable
 import Data.Generics.Uniplate.Data
 import Data.Binary.Put
+import Data.Binary.Get
 import Random
 
 import FAT
@@ -268,34 +269,33 @@ generateData ct cl es = mergeRules $ execWriter $ do
       bslen' = BS.length
       bslen = fromIntegral . BS.length
 
-type ClusterTable = [Word32] 
+type ClusterTable = BS.ByteString 
 
-genFAT :: ClustSize32 -> Int -> [AllocEntry] -> [Word32]
-genFAT cl size alloc = allocated ++ free 
+genFAT :: ClustSize32 -> Int -> [AllocEntry] -> ClusterTable 
+genFAT cl size alloc = BS.append allocated free 
   where
-    allocated = execWriter $ do
-      tell [0x0FFFFFF8, fatLastCluster32]
+    allocated = runPut $ do
+      mapM_ putWord32le [0x0FFFFFF8, fatLastCluster32]
       forM_ alloc $ \(AllocEntry{beginSect=bs, endSect=es}) -> do
-        tell (take (clen bs es - 1) [2 + 1 + start bs .. ])
-        tell [fatLastCluster32]
+        mapM_ putWord32le (take (clen bs es - 1) [2 + 1 + start bs .. ])
+        putWord32le fatLastCluster32
 
-    free = replicate freeNum 0
-    freeNum = ((size - 4*(length allocated)) `div` 4)
+    free = runPut $ replicateM_ freeNum (putWord32le 0)
+    freeNum = ((size - 4*(fromIntegral (BS.length allocated))) `div` 4)
     spc  = fatSectPerClust cl
     clen a b = (b - a + 1) `div` spc
     start bs = fromIntegral (bs `div` spc) :: Word32
-
-
 
 genFAT' :: ClustSize32 -> Int -> [AllocEntry] -> [Rule]
 genFAT' cl size alloc = undefined
   where
 
-
 encodeFAT :: Int -> ClusterTable -> [Rule]
 encodeFAT from xs = runEncode (eat xs)
-  where eat [] = sector []
-        eat xs = sector (take ns xs) >> eat (drop ns xs)
+  where eat bs | BS.null bs = sector []
+               | otherwise  = let (a, b) = BS.splitAt (fromIntegral (4*fatSectLen)) bs
+                                  bn = fromIntegral (BS.length a) `div` 4
+                              in sector (runGet (replicateM bn getWord32le) a) >> eat b
 
         runEncode f = mergeSeries $ evalState (execWriterT f) from
         
@@ -430,7 +430,9 @@ main = do
 
   ct <- getClockTime >>= toCalendarTime
   let gen = generateData (Just ct) clust alloc
-  let !fat1 = genFAT clust fatSize alloc
+  let fat1 = genFAT clust fatSize alloc
+
+--  error (show (BS.length fat1))
 
   let fatInfo = FAT32GenInfo clust volSize volId "TEST" (fatSectorsOf fatSize) (Just rsvd)
   let fatBin  = fatGenBoot32 fatInfo
@@ -474,7 +476,7 @@ main = do
       mapM_ print alloc
 
     ("fat" : _) -> do
-        BS.hPut stdout (runPut $ mapM_ putWord32le fat1)
+        BS.hPut stdout fat1
         hFlush stdout
 
     ("stats" : _) -> do
