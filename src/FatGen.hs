@@ -1,5 +1,4 @@
 {-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
-
 module Main where
 
 import qualified Data.ByteString.Lazy as BS
@@ -107,7 +106,7 @@ fatSample5 = filesystem $ do
   file "file20" (gigs 1)
 
 main = do
-  let cl = CL_512
+  let cl = CL_4K
   let rsvd  = 32
   let sample = fatSample2
   let dSize = (megs 512)
@@ -159,7 +158,6 @@ main = do
 
     _ -> do
       putStrLn "Usage: FatGen bin|asm|stubs|opcodes|rules|stats"
-
 
 randomW32 :: IO Word32
 randomW32 = liftM fromIntegral (randomIO :: IO Int)
