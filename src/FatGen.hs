@@ -85,7 +85,7 @@ fatSample4 = filesystem $ do
   file "file19" (megs 100) emptyFile
   file "file20" (megs 100) emptyFile
 
-fatSample5 = filesystem $ do
+fatSample6 = filesystem $ do
   file "file1" (gigs 1) emptyFile
   file "file2" (gigs 1) emptyFile
   file "file3" (gigs 1) emptyFile
@@ -95,30 +95,37 @@ fatSample5 = filesystem $ do
   file "file7" (gigs 1) emptyFile
   file "file8" (gigs 1) emptyFile
   file "file9" (gigs 1) emptyFile
-  file "file10" (gigs 1) emptyFile
-  file "file11" (gigs 1) emptyFile
-  file "file12" (gigs 1) emptyFile
-  file "file13" (gigs 1) emptyFile
-  file "file14" (gigs 1) emptyFile
-  file "file15" (gigs 1) emptyFile
-  file "file16" (gigs 1) emptyFile
-  file "file17" (gigs 1) emptyFile
-  file "file18" (gigs 1) emptyFile
-  file "file19" (gigs 1) emptyFile
-  file "file20" (gigs 1) emptyFile
+
+fatSample5 = filesystem $ do
+  file "file1" (gigs 1) helloFile
+  file "file2" (gigs 1) helloFile
+  file "file3" (gigs 1) helloFile
+  file "file4" (gigs 1) helloFile
+  file "file5" (gigs 1) helloFile
+  file "file6" (gigs 1) helloFile
+  file "file7" (gigs 1) helloFile
+  file "file8" (gigs 1) helloFile
+  file "file9" (gigs 1) helloFile
+  file "file10" (gigs 1) helloFile
+  file "file11" (gigs 1) helloFile
+  file "file12" (gigs 1) helloFile
+  file "file13" (gigs 1) helloFile
+  file "file14" (gigs 1) helloFile
+  file "file15" (gigs 1) helloFile
+  file "file16" (gigs 1) helloFile
 
 main = do
-  let cl = CL_4K
+  let cl = CL_32K
   let rsvd  = 32
-  let sample = fatSample2
-  let dSize = (megs 512)
+  let sample = fatSample5
+  let dSize = calcDataSize cl sample 
 
   newStdGen >>= setStdGen
   volId <- randomW32 
   ct <- getClockTime >>= toCalendarTime
 
   let fSize = fatSize cl dSize
-  let fat1 = genFileAllocTableRaw cl dSize sample 
+  let fat1 = genFileAllocTableRaw cl dSize sample
   let volSize = calcVolSize rsvd cl dSize
   let fatInfo = FAT32GenInfo cl volSize volId "TEST" (fatSectorsOf fSize) (Just rsvd)
   let rules = genFATRules fatInfo fat1 ct sample
@@ -156,6 +163,7 @@ main = do
 
     ("stats" : _) -> do
         putStrLn $ printf "FAT SIZE: %s (%s)" (show fSize) (show (fatSectorsOf fSize))
+        putStrLn $ printf "DATA SIZE: %d " dSize
         putStrLn $ printf "VOL SIZE: %d " volSize
 
     _ -> do

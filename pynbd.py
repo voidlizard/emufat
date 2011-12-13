@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import struct, socket, sys
+import os
 # network block device server, substitute for nbd-server.  Probably slower.
 # But it works!  And it's probably a lot easier to improve the
 # performance of this Python version than of the C version.  This
@@ -30,6 +31,8 @@ import struct, socket, sys
 #   on the end of your filename
 # - backgrounding
 # - daemonizing
+
+fileSize = 0
 
 class Error(Exception): pass
 
@@ -98,20 +101,25 @@ class nbd_request:
 
 def serveclient(asock, afile):
     "Serves a single client until it exits."
-    afile.seek(0)
-    abuf = list(afile.read())
-    asock.send(negotiation(len(abuf)))
+#    afile.seek(0)
+#    abuf = list(afile.read())
+    asock.send(negotiation(fileSize))
     while 1:
         req = nbd_request(asock)
         if req.type == read_request:
-            asock.send(req.reply(error=0, 
-                data=''.join(abuf[req.range()])))
+            buf = ''
+            for i in xrange(0, req.len / 512):
+                po = os.popen("cbits/teststubs %d < %s" % ((req.offset / 512) + i, afile))
+                buf += po.read()
+#            print "%d %d %d" % (req.offset, req.len, len(buf))
+            asock.send(req.reply(error=0, data=buf[:req.len]))
+#                data=''.join(abuf[req.range()])))
         elif req.type == write_request:
-            abuf[req.range()] = req.data
-            afile.seek(req.offset)
-            afile.write(req.data)
-            afile.flush()
-            asock.send(req.reply(error=0))
+#            abuf[req.range()] = req.data
+#            afile.seek(req.offset)
+#            afile.write(req.data)
+#            afile.flush()
+            asock.send(req.reply(error=1))
         elif req.type == disconnect_request:
             asock.close()
             return
@@ -124,8 +132,10 @@ def mainloop(listensock, afile):
         serveclient(sock, afile)
 
 def main(argv):
+    global fileSize
     "Given a port and a filename, serves up the file."
-    afile = file(argv[2], 'rb+')
+    afile = argv[2] # file(argv[2], 'rb+')
+    fileSize = int(argv[3]) 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(('', int(argv[1])))

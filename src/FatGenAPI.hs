@@ -3,7 +3,7 @@ module FatGenAPI (Entry, EntryInfo(..), ClusterTable(..), FAT32GenInfo(..),
                   allocate, filesystem, dir, file, emptyDir, 
                   gigs, megs, compileRules, genFileAllocTableRaw, 
                   genFileAllocTable, fatSize, calcVolSize, genFATRules,
-                  emptyFile
+                  calcDataSize, emptyFile
                  ) where
 
 import qualified Data.ByteString.Lazy as BS
@@ -416,6 +416,13 @@ fatGenBoot32 info = addRsvd $ runPut $ do
           where len x = fromIntegral $ BS.length x
 
 fatSize cl dSize = fatLenToSect $ (fatClNum cl dSize) * 4 + 2*4
+
+calcDataSize :: ClustSize32 -> Entry -> Int
+calcDataSize cl e = size
+  where allocated = allocate cl 0 e
+        start = (beginSect.head) allocated
+        end   = (endSect.last) allocated
+        size  = (end - start + 1) * fatSectLen
 
 calcVolSize rsvd cl dSize = rsvd*fatSectLen + 2*(fatSize cl dSize) + dSize
 
