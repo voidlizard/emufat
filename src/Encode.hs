@@ -1,6 +1,6 @@
 module Encode where
 
-import Data.Word (Word8, Word32)
+import Data.Word (Word8, Word32, Word64)
 import qualified Data.ByteString.Lazy as BS
 import Control.Monad.Writer
 import Control.Monad.State
@@ -11,11 +11,11 @@ import qualified Data.Map as M
 import Text.Printf
 import Util
 
-data Rule  = REQ Int [Chunk] | RANGE Int Int [Chunk] deriving Show
+data Rule  = REQ Word64 [Chunk] | RANGE Word64 Word64 [Chunk] deriving Show
 data Chunk = SEQ BS.ByteString
-           | RLE Int Word8 
+           | RLE Word64 Word8 
            | SER Word32 Word32
-           | NSER Word32 Int Word32 -- base offset step
+           | NSER Word32 Word64 Word32 -- base offset step
            | CALLBACK Word8
            deriving (Eq, Ord)
 
@@ -26,7 +26,7 @@ instance Show Chunk where
   show (NSER a b c) = printf "NSER %d %d %d" a b c
   show (CALLBACK n) = printf "CALLBACK %d" n
 
-data CmpTree = GEQ Int CmpTree CmpTree | CODE [Rule]
+data CmpTree = GEQ Word64 CmpTree CmpTree | CODE [Rule]
   deriving (Show)
 
 mkCmpTree :: [Rule] -> CmpTree
@@ -47,11 +47,11 @@ mkCmpTree r = mkTree' rulemap
               (le, geq) = splitGeq n xs
           in GEQ n (mkTree' le) (mkTree' geq)
 
-rsect :: Rule -> Int
+rsect :: Rule -> Word64
 rsect (REQ n _) = n
 rsect (RANGE _ n _) = n
 
-fsect :: Rule -> Int
+fsect :: Rule -> Word64
 fsect (REQ n _) = n
 fsect (RANGE n _ _) = n
 
@@ -60,7 +60,7 @@ encodeBlock bs = eat [] [] groups
   where groups  = group (BS.unpack bs)
         eat :: [Chunk] -> [Word8] -> [[Word8]] -> [Chunk]
         eat acc seq (x:xs) | length x == 1 = eat acc (head x:seq) xs
-                           | length x >  1 = eat (packRle (RLE (length x) (head x)) seq acc) [] xs
+                           | length x >  1 = eat (packRle (RLE (fromIntegral (length x)) (head x)) seq acc) [] xs
         eat acc [] [] = reverse acc
         eat acc seq [] = reverse (packseq seq : acc)
         packRle r [] acc = r : acc
@@ -68,7 +68,7 @@ encodeBlock bs = eat [] [] groups
         packseq seq = SEQ (BS.pack (reverse seq))
 
 
-encodeRaw :: Int -> Int -> BS.ByteString -> [Rule]
+encodeRaw :: Word64 -> Word64 -> BS.ByteString -> [Rule]
 encodeRaw blocklen from bs = mergeRules $ evalState (execWriterT (eat bs)) from
   where eat bs | BS.null bs = return () 
                | otherwise = msplit bs block eat
@@ -83,7 +83,7 @@ encodeRaw blocklen from bs = mergeRules $ evalState (execWriterT (eat bs)) from
 decodeBlock :: [Chunk] -> BS.ByteString
 decodeBlock cs = runPut $ mapM_ chunk cs
   where chunk (SEQ bs)  = putLazyByteString bs
-        chunk (RLE n w) = replicateM_ n (putWord8 w)
+        chunk (RLE n w) = replicateM_ (fromIntegral n) (putWord8 w)
         chunk _ = undefined
 
 mergeRules :: [Rule] -> [Rule]
