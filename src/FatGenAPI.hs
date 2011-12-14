@@ -150,7 +150,7 @@ allocate cl from = eFix . eAlloc . eOrder . filter eFilt . universe
         fentry (n, xs) e =
           let sectors = entryLen cl e `div` fatSectLen
               begin = n
-              end   = begin + sectors - 1
+              end   = max n (begin + sectors - 1)
               n'    = n + sectors
               allocated = AllocEntry begin end e
           in (n', allocated : xs)

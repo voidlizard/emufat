@@ -114,10 +114,53 @@ fatSample5 = filesystem $ do
   file "file15" (gigs 1) helloFile
   file "file16" (gigs 1) helloFile
 
+fatSample7 = filesystem $ do
+  file "00.mp3" (gigs 2) $ const $ runPut $ do
+    putWord32be 0xCAFEBABE
+    putWord8 192
+    putWord8 168
+    putWord8 1
+    putWord8 1
+    putWord32be 3000
+    putLazyByteString "/jopakita/pechentreski.mp3"
+    putWord8 0
+ 
+  file "01.mp3" (gigs 2) $ const $ runPut $ do
+    putWord32be 0xCAFEBABE
+    putWord8 192
+    putWord8 168
+    putWord8 1
+    putWord8 1
+    putWord32be 3000
+    putLazyByteString "lalalalala/qlqlqlqlqql/jopakita/pechentreski.mp3"
+    putWord8 0
+
+
+fatSample8 = filesystem $ do
+  file "00.mp3" (gigs 2) $ const $ runPut $ do
+    putWord32be 0xCAFEBABE
+    putWord8 192
+    putWord8 168
+    putWord8 1
+    putWord8 1
+    putWord32be 3000
+    putLazyByteString "/jopakita/pechentreski.mp3"
+    putWord8 0
+
+  file "00.mp3" (gigs 2) $ const $ runPut $ do
+    putWord32be 0xCAFEBABE
+    putWord8 192
+    putWord8 168
+    putWord8 1
+    putWord8 1
+    putWord32be 3000
+    putLazyByteString "/jopakita/pechentreski.mp3"
+    putWord8 0
+
 main = do
   let cl = CL_32K
   let rsvd  = 32
-  let sample = fatSample5
+  let sample = fatSample8
   let dSize = calcDataSize cl sample 
 
   newStdGen >>= setStdGen
