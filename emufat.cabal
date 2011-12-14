@@ -47,5 +47,6 @@ executable TestVM
 library
     hs-source-dirs:	     src
     exposed-modules:     FatGenAPI, FAT
+    other-modules:       Encode, VMCode, EncodeVM, CWriter, Util
 
     ghc-options:         -O2
