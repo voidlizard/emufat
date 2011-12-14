@@ -144,17 +144,7 @@ fatSample8 = filesystem $ do
     putWord8 1
     putWord8 1
     putWord32be 3000
-    putLazyByteString "/jopakita/pechentreski.mp3"
-    putWord8 0
-
-  file "00.mp3" (gigs 2) $ const $ runPut $ do
-    putWord32be 0xCAFEBABE
-    putWord8 192
-    putWord8 168
-    putWord8 1
-    putWord8 1
-    putWord32be 3000
-    putLazyByteString "/jopakita/pechentreski.mp3"
+    putLazyByteString "/lala/bebe/qq/zzz/qq.mp3"
     putWord8 0
 
 main = do
