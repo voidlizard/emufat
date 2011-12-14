@@ -1,6 +1,6 @@
 module FAT where
 
-import Data.Word (Word32, Word8, Word16)
+import Data.Word (Word32, Word8, Word16, Word64)
 import Data.Bits
 import Data.List
 import System.Time
@@ -8,17 +8,17 @@ import System.Time
 data ClustSize32 = CL_512 | CL_4K | CL_8K | CL_16K | CL_32K
   deriving (Eq, Ord, Show)
 
-data FAT = FAT32 { bytesPerSect :: Int 
-                 , sectPerClust :: Int
-                 , sectPerFAT   :: Int
-                 , rootClust    :: Int
-                 , resvdSectCnt :: Int
-                 , numFat       :: Int
+data FAT = FAT32 { bytesPerSect :: Word64
+                 , sectPerClust :: Word64
+                 , sectPerFAT   :: Word64
+                 , rootClust    :: Word64
+                 , resvdSectCnt :: Word64
+                 , numFat       :: Word64
                  } deriving Show
 
 data ATTR = RDONLY | HIDDEN | SYSTEM | VOL_ID | DIR | ARCH
 
-fatBytesPerCluster :: FAT -> Int
+fatBytesPerCluster :: FAT -> Word64
 fatBytesPerCluster (FAT32 { bytesPerSect = bps, sectPerClust = spc }) = bps*spc
 
 fatLastCluster32 :: Word32
@@ -29,7 +29,7 @@ fatClusters cl n = ceiling (fromIntegral n / ((fromIntegral . fromEnum) cl))
 
 fatSizeToSect = fatClusters
 
-fatSectorsOf :: Int -> Int
+fatSectorsOf :: Word64 -> Word64
 fatSectorsOf n = ceiling ((fromIntegral n) / (fromIntegral fatSectLen))
 
 fatSizeToClust :: Integral a => ClustSize32 -> a -> a
@@ -37,14 +37,15 @@ fatSizeToClust cl n = (fromIntegral (fromEnum cl)) * (fromIntegral $ fatClusters
 
 fatLenToSect n = fatSectLen * fatSectorsOf n
 
-fatSectPerClust cl = (fromEnum cl) `div` (fatSectLen)
+fatSectPerClust :: ClustSize32 -> Word64
+fatSectPerClust cl = (fromIntegral (fromEnum cl)) `div` (fatSectLen)
 
 fatAttrB :: [ATTR] -> Word8
 fatAttrB as = foldl' f  0 as
   where f acc x = acc .|. (fromIntegral . fromEnum) x
 
 fatDate :: CalendarTime -> Word16
-fatDate ct = d .|. m .|. y 
+fatDate ct = d .|. m .|. y
   where d = w16 (ctDay ct) .&. 0x1F
         m = (w16 (fromEnum (ctMonth ct) + 1) .&. 0x0F) `shiftL` 5
         y = (w16 (ctYear ct - 1980) .&. 0x7F) `shiftL` 9
@@ -55,13 +56,13 @@ fatTime ct = s .|. m .|. h
         m = (w16 (ctMin ct) .&. 0x3F) `shiftL` 5
         h = (w16 (ctHour ct) .&. 0x1F) `shiftL` 11
 
---fatSectLen :: Int
+--fatSectLen :: Word64
 fatSectLen = 512
 
-fatSectNum :: ClustSize32 -> Int 
-fatSectNum cl = fromEnum cl `div` (fromIntegral fatSectLen)
+fatSectNum :: ClustSize32 -> Word64
+fatSectNum cl = fromIntegral (fromEnum cl) `div` (fromIntegral fatSectLen)
 
-fatClNum :: ClustSize32 -> Int -> Int 
+fatClNum :: ClustSize32 -> Word64 -> Word64
 fatClNum cl s = ceiling $ (fromIntegral s) / (fromIntegral $ fromEnum cl)
 
 w16 :: Integral a => a -> Word16
@@ -79,7 +80,7 @@ instance Enum ClustSize32 where
   toEnum  16384   = CL_16K
   toEnum  32768   = CL_32K
 
-instance Enum ATTR where 
+instance Enum ATTR where
   fromEnum RDONLY = 0x01
   fromEnum HIDDEN = 0x02
   fromEnum SYSTEM = 0x04
@@ -90,7 +91,7 @@ instance Enum ATTR where
   toEnum 0x02 = HIDDEN
   toEnum 0x04 = SYSTEM
   toEnum 0x08 = VOL_ID
-  toEnum 0x10 = DIR   
+  toEnum 0x10 = DIR
   toEnum 0x20 = ARCH
 
 

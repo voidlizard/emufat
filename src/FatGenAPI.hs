@@ -1,16 +1,16 @@
 {-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 module FatGenAPI (Entry, EntryInfo(..), ClusterTable(..), FAT32GenInfo(..),
-                  allocate, filesystem, dir, file, emptyDir, 
-                  gigs, megs, compileRules, genFileAllocTableRaw, 
+                  allocate, filesystem, dir, file, emptyDir,
+                  gigs, megs, compileRules, genFileAllocTableRaw,
                   genFileAllocTable, fatSize, calcVolSize, genFATRules,
                   calcDataSize, emptyFile
                  ) where
 
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString.Lazy.Char8 as BS8 
+import qualified Data.ByteString.Lazy.Char8 as BS8
 import System.Time
 import Text.Printf
-import Data.Word (Word8, Word32, Word16)
+import Data.Word (Word8, Word32, Word16, Word64)
 import Data.Bits
 import Data.Char
 import Data.List
@@ -41,13 +41,13 @@ import EncodeVM (Block)
 import CWriter
 import Util
 
-data EntryInfo = EntryInfo { fileId :: Int, fileName :: String, fileSize :: Int }
+data EntryInfo = EntryInfo { fileId :: Word64, fileName :: String, fileSize :: Word64 }
 
-data Entry =  DirRoot    Int [Entry]
-            | DirDot     Int
-            | DirDotDot  Int
-            | Dir Int String [Entry]
-            | File Int String Int BS.ByteString
+data Entry =  DirRoot    Word64 [Entry]
+            | DirDot     Word64
+            | DirDotDot  Word64
+            | Dir Word64 String [Entry]
+            | File Word64 String Word64 BS.ByteString
   deriving (Eq, Ord, Data, Typeable, Show)
 
 entries :: Entry -> [Entry]
@@ -56,12 +56,12 @@ entries (Dir _ _ es) = es
 entries _ = []
 
 newtype EntryIdT m a = EntryIdT {
-    runF :: (WriterT [Entry] (StateT (Int, Int) m)) a 
-} deriving (Monad, MonadWriter [Entry], MonadState (Int, Int))
+    runF :: (WriterT [Entry] (StateT (Word64, Word64) m)) a
+} deriving (Monad, MonadWriter [Entry], MonadState (Word64, Word64))
 
 type EntryIdM = EntryIdT Identity
 
-runEntryIdM :: (Int, Int) -> EntryIdM a -> ([Entry], (Int, Int))
+runEntryIdM :: (Word64, Word64) -> EntryIdM a -> ([Entry], (Word64, Word64))
 runEntryIdM init f = runState (execWriterT (runF f)) init
 
 filesystem :: EntryIdM () -> Entry
@@ -76,7 +76,7 @@ dir s f = do
   tell [Dir n s (dots ++ dirs)]
   put (n', p)
 
-file :: String -> Int -> (EntryInfo -> BS.ByteString) -> EntryIdM ()
+file :: String -> Word64 -> (EntryInfo -> BS.ByteString) -> EntryIdM ()
 file nm sz fn = do
   (n,p) <- get
   tell [File n nm sz (fn (EntryInfo n nm sz))]
@@ -92,21 +92,21 @@ isFile :: Entry -> Bool
 isFile (File _ _ _ _) = True
 isFile _ = False
 
-allocTable :: FAT -> Int -> Int -> BS.ByteString
+allocTable :: FAT -> Word64 -> Word64 -> BS.ByteString
 allocTable fat from len = runPut $ mapM_ putWord32le clusters
   where clusters = [w32 from .. w32 (from + clNum - 2)] ++ [fatLastCluster32]
         clNum = ceiling (fromIntegral ( len `div` bpc ))
         bpc = fatBytesPerCluster fat
-        w32 :: Int -> Word32
+        w32 :: Word64 -> Word32
         w32 x = fromIntegral x
 
-megs :: Int -> Int
+megs :: Word64 -> Word64
 megs = fromIntegral . ((*) (1024*1024))
 
-gigs :: Int -> Int
+gigs :: Word64 -> Word64
 gigs = fromIntegral . ((*) 1024) . megs
 
-fatDirLenB :: [Entry] -> Int
+fatDirLenB :: [Entry] -> Word64
 fatDirLenB = sum . map eLen
   where eLen (DirRoot _ _) = 0
         eLen (DirDot _)  = 32
@@ -116,30 +116,30 @@ fatDirLenB = sum . map eLen
         eLen (File _ nm _ _) | length nm < 12 = 32
                            | otherwise = error "Long names are unsupported yet"
 
-fatDataEntries :: ClustSize32 -> Entry -> [(Entry, Int)]
+fatDataEntries :: ClustSize32 -> Entry -> [(Entry, Word64)]
 fatDataEntries cl e = [entry x | x <- universe e]
   where entry e  = (e, entryLen cl e)
 
-entryLen :: ClustSize32 -> Entry -> Int        
+entryLen :: ClustSize32 -> Entry -> Word64
 entryLen cl e@(DirRoot _ es)  = fatSizeToClust cl $ fatDirLenB es
 entryLen cl e@(DirDot _)      = 0
 entryLen cl e@(DirDotDot _)   = 0
 entryLen cl e@(Dir _ n es)    = fatSizeToClust cl $ fatDirLenB es
 entryLen cl e@(File _ n sz _) = fatSizeToClust cl sz
 
-fatMaxFileLen :: [(Entry, Int)] -> Int
+fatMaxFileLen :: [(Entry, Word64)] -> Word64
 fatMaxFileLen es = S.findMax $ S.fromList $ map snd es
 
 type FATWriterM = Writer [Rule] -- FATWriterT []
 
 runFATWriter f = execWriter f
 
-data AllocEntry = AllocEntry { beginSect :: Int
-                             , endSect   :: Int
+data AllocEntry = AllocEntry { beginSect :: Word64
+                             , endSect   :: Word64
                              , entry     :: Entry
                              } deriving (Show)
 
-allocate :: ClustSize32 -> Int -> Entry -> [AllocEntry]
+allocate :: ClustSize32 -> Word64 -> Entry -> [AllocEntry]
 allocate cl from = eFix . eAlloc . eOrder . filter eFilt . universe
   where eFilt (File _ _ _ _) = True
         eFilt (Dir _ _ _)    = True
@@ -156,10 +156,10 @@ allocate cl from = eFix . eAlloc . eOrder . filter eFilt . universe
           in (n', allocated : xs)
         eFix = id
 
-allocateMap :: [AllocEntry] -> M.Map Entry Int
+allocateMap :: [AllocEntry] -> M.Map Entry Word64
 allocateMap = M.fromList . map (\x -> (entry x, beginSect x))
 
-writeEntry :: Maybe CalendarTime -> Int -> Entry -> BS.ByteString 
+writeEntry :: Maybe CalendarTime -> Word64 -> Entry -> BS.ByteString
 
 writeEntry _ clust (DirRoot _ es) = error "oops"
 
@@ -175,7 +175,7 @@ writeEntry ct clust (DirDotDot q) =
 writeEntry ct clust (File _ nm sz _) =
   entryRecordShort nm sz clust ct []
 
-entryRecordShort :: String -> Int -> Int -> Maybe CalendarTime -> [ATTR] -> BS.ByteString
+entryRecordShort :: String -> Word64 -> Word64 -> Maybe CalendarTime -> [ATTR] -> BS.ByteString
 entryRecordShort nm size clust clk a = runPut $ do
   putNameASCII nm -- Name
   putWord8 (fatAttrB a) -- Attr
@@ -202,7 +202,7 @@ putNameASCII s = mapM_ putWord8 bytes
   where bytes :: [Word8]
         bytes = map (fromIntegral . ord) (validFATNameASCII s)
 
-badChars :: [Int]
+--badChars :: [Word32]
 badChars = [0x22, 0x2A, 0x2C, 0x2F ] ++ [0x3A .. 0x3F] ++ [0x5B .. 0x5D]
 
 validFATNameASCII :: String -> String
@@ -252,7 +252,7 @@ generateData ct cl es = mergeRules $ execWriter $ do
 
       firstSect = (beginSect . head) es
       clustN s = (s - firstSect) `div` (fatSectPerClust cl) + 2
- 
+
       writeEntries bsect esect =
         encode bsect esect . BS.concat . map (\e -> writeEntry ct (clOf e) e)
 --        encode bsect esect . BS.concat . map (\e -> trace ("ENTRY " ++ show e ++ " " ++ show (clOf e)) $ writeEntry ct (clOf e) e)
@@ -275,15 +275,15 @@ generateData ct cl es = mergeRules $ execWriter $ do
       bslen' = BS.length
       bslen = fromIntegral . BS.length
 
-type ClusterTable = BS.ByteString 
+type ClusterTable = BS.ByteString
 
-genFAT :: ClustSize32 -> Int -> [AllocEntry] -> ClusterTable 
+genFAT :: ClustSize32 -> Word64 -> [AllocEntry] -> ClusterTable
 genFAT cl size alloc = BS.append allocated free
   where
     allocated = runPut $ do
       mapM_ putWord32le [0x0FFFFFF8, fatLastCluster32]
       forM_ alloc $ \(AllocEntry{beginSect=bs, endSect=es}) -> do
-        mapM_ putWord32le (take (clen bs es - 1) [2 + 1 + start bs .. ])
+        mapM_ putWord32le (take (fromIntegral (clen bs es - 1)) [2 + 1 + start bs .. ])
         putWord32le fatLastCluster32
 
     free = BS.replicate ((fromIntegral size) - BS.length allocated) 0
@@ -291,7 +291,7 @@ genFAT cl size alloc = BS.append allocated free
     clen a b = (b - a + 1) `div` spc
     start bs = fromIntegral (bs `div` spc) :: Word32
 
-encodeFAT :: Int -> ClusterTable -> [Rule]
+encodeFAT :: Word64 -> ClusterTable -> [Rule]
 encodeFAT from xs = runEncode (eat xs)
   where eat bs | BS.null bs = sector []
                | otherwise  = let (a, b) = BS.splitAt (fromIntegral (fatSectLen)) bs
@@ -299,7 +299,7 @@ encodeFAT from xs = runEncode (eat xs)
                               in sector (runGet (replicateM bn getWord32le) a) >> eat b
 
         runEncode f = mergeSeries $ evalState (execWriterT f) from
-        
+
         sector chunk | null chunk = tell []
                      | otherwise  = do
           i <- lift get
@@ -309,7 +309,7 @@ encodeFAT from xs = runEncode (eat xs)
         ns = fatSectLen `div` 4
 
         mergeSeries rules = execWriter (eat rules)
-          where 
+          where
             mCnd1 n n' a b a' b' = n+1 == n' && (b+1) == a' && (b - a) == (b' - a')
             mCnd2 n n' bs off sp a b =
               (n+1) == n' && sp == (b-a+1) && bs+(fromIntegral (n'-off))*sp == a
@@ -346,14 +346,14 @@ adjRules sect = map withRule
         withRule (RANGE a b c) = RANGE (a+sect) (b+sect) c
 
 data FAT32GenInfo = FAT32GenInfo { clusterSize  :: ClustSize32
-                                 , volSize      :: Int
+                                 , volSize      :: Word64
                                  , volID        :: Word32
                                  , volLabel     :: String
-                                 , fatSectors   :: Int
-                                 , reservedSect :: Maybe Int
+                                 , fatSectors   :: Word64
+                                 , reservedSect :: Maybe Word64
                                  } deriving (Show)
 
-fatGenBoot32 :: FAT32GenInfo -> BS.ByteString 
+fatGenBoot32 :: FAT32GenInfo -> BS.ByteString
 fatGenBoot32 info = addRsvd $ runPut $ do
                                 -- BOOT AREA   sect0
   putBytes [0xEB, 0x58, 0x90]   --  0 JmpBoot
@@ -394,7 +394,7 @@ fatGenBoot32 info = addRsvd $ runPut $ do
   putWord32le 0xFFFFFFFF        --    NxtFree
   putBytes (replicate 12 0)     --    Reserved
   putWord32le 0xAA550000        --    TrailSign
- 
+
   where bsOEMName = [0x6d, 0x6b, 0x64, 0x6f, 0x73, 0x66, 0x73, 0x00]
         sectNum = w32 (len `div` fatSectLen)
         len = volSize info
@@ -409,15 +409,15 @@ fatGenBoot32 info = addRsvd $ runPut $ do
         w32 = fromIntegral
         addRsvd bs  = runPut $ do
                        putLazyByteString bs
-                       replicateM_ (fatSectLen*6 - (len bs)) (putWord8 0)
+                       replicateM_ (fromIntegral(fatSectLen) * 6 - (len bs)) (putWord8 0)
                        putLazyByteString bs
-                       replicateM_ ((rsvd' * fatSectLen) - (2*(len bs) + fatSectLen*6 - (len bs))) (putWord8 0)
+                       replicateM_ (fromIntegral ((rsvd' * fatSectLen) - (2*(len bs) + fatSectLen*6 - (len bs)))) (putWord8 0)
 
           where len x = fromIntegral $ BS.length x
 
 fatSize cl dSize = fatLenToSect $ (fatClNum cl dSize) * 4 + 2*4
 
-calcDataSize :: ClustSize32 -> Entry -> Int
+calcDataSize :: ClustSize32 -> Entry -> Word64
 calcDataSize cl e = size
   where allocated = allocate cl 0 e
         start = (beginSect.head) allocated
@@ -426,13 +426,13 @@ calcDataSize cl e = size
 
 calcVolSize rsvd cl dSize = rsvd*fatSectLen + 2*(fatSize cl dSize) + dSize
 
-genFileAllocTableRaw :: ClustSize32 -> Int -> Entry -> ClusterTable
+genFileAllocTableRaw :: ClustSize32 -> Word64 -> Entry -> ClusterTable
 genFileAllocTableRaw cl dSize sample = genFAT cl fs alloc
   where
    fs = fatSize cl dSize
    alloc = allocate cl 0 sample
 
-genFileAllocTable :: Int -> ClusterTable -> [Rule]
+genFileAllocTable :: Word64 -> ClusterTable -> [Rule]
 genFileAllocTable off t = encodeFAT (off) t
 
 genFATRules :: FAT32GenInfo -> ClusterTable -> CalendarTime -> Entry -> [Rule]
@@ -452,6 +452,4 @@ compileRules :: [Rule] -> [Block]
 compileRules rules = vm
   where
     tree = mkCmpTree rules
-    vm = mkVMCode tree 
-
-
+    vm = mkVMCode tree
