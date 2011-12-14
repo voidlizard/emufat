@@ -114,10 +114,25 @@ fatSample5 = filesystem $ do
   file "file15" (gigs 1) helloFile
   file "file16" (gigs 1) helloFile
 
+urls :: [(Word32, String, String)]
+urls = [(12345, "http://webcast.emg.fm:55655/europaplus128.mp3", "mp3"),
+        (12345, "http://94.25.53.133/nashe-128.m3u", "mp3")]
+fatSample7 = 
+    filesystem $ mapM_ (constructFile (gigs 2)) $ zip [1..] urls
+
+constructFile size (n, (ip, url, ext)) = do
+  let name = printf "%02d.%s" n ext
+      firstBytes = runPut $ do
+        putWord32be n
+        putWord32be ip
+        putLazyByteString $ BS8.pack url
+        putWord8 0
+  file name size $ const firstBytes
+
 main = do
   let cl = CL_32K
   let rsvd  = 32
-  let sample = fatSample5
+  let sample = fatSample7
   let dSize = calcDataSize cl sample 
 
   newStdGen >>= setStdGen
