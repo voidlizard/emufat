@@ -44,3 +44,8 @@ executable TestVM
 
     ghc-options:         -O2
 
+library
+    hs-source-dirs:	     src
+    exposed-modules:     FatGenAPI, FAT
+
+    ghc-options:         -O2
