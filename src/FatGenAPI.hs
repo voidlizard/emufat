@@ -1,6 +1,6 @@
 {-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 module FatGenAPI (Entry, EntryInfo(..), ClusterTable(..), FAT32GenInfo(..),
-                  allocate, filesystem, dir, file, emptyDir,
+                  allocate, filesystem, dir, file, hiddenFile, emptyDir,
                   gigs, megs, compileRules, genFileAllocTableRaw,
                   genFileAllocTable, fatSize, calcVolSize, genFATRules,
                   calcDataSize, emptyFile
@@ -48,6 +48,7 @@ data Entry =  DirRoot    Word64 [Entry]
             | DirDotDot  Word64
             | Dir Word64 String [Entry]
             | File Word64 String Word64 BS.ByteString
+            | HiddenFile Word64 String Word64 BS.ByteString
   deriving (Eq, Ord, Data, Typeable, Show)
 
 entries :: Entry -> [Entry]
@@ -82,6 +83,12 @@ file nm sz fn = do
   tell [File n nm sz (fn (EntryInfo n nm sz))]
   put (n+1, p)
 
+hiddenFile :: String -> Word64 -> (EntryInfo -> BS.ByteString) -> EntryIdM ()
+hiddenFile nm sz fn = do
+  (n,p) <- get
+  tell [HiddenFile n nm sz (fn (EntryInfo n nm sz))]
+  put (n+1, p)
+
 emptyFile :: (EntryInfo -> BS.ByteString)
 emptyFile = const (BS.replicate (fromIntegral fatSectLen) 0)
 
@@ -90,6 +97,7 @@ emptyDir = tell []
 
 isFile :: Entry -> Bool
 isFile (File _ _ _ _) = True
+isFile (HiddenFile _ _ _ _) = True
 isFile _ = False
 
 allocTable :: FAT -> Word64 -> Word64 -> BS.ByteString
@@ -115,6 +123,9 @@ fatDirLenB = sum . map eLen
                          | otherwise = error "Long names are unsupported yet"
         eLen (File _ nm _ _) | length nm < 12 = 32
                            | otherwise = error "Long names are unsupported yet"
+        eLen (HiddenFile _ nm _ _) | length nm < 12 = 32
+                           | otherwise = error "Long names are unsupported yet"
+
 
 fatDataEntries :: ClustSize32 -> Entry -> [(Entry, Word64)]
 fatDataEntries cl e = [entry x | x <- universe e]
@@ -126,6 +137,7 @@ entryLen cl e@(DirDot _)      = 0
 entryLen cl e@(DirDotDot _)   = 0
 entryLen cl e@(Dir _ n es)    = fatSizeToClust cl $ fatDirLenB es
 entryLen cl e@(File _ n sz _) = fatSizeToClust cl sz
+entryLen cl e@(HiddenFile _ n sz _) = fatSizeToClust cl sz
 
 fatMaxFileLen :: [(Entry, Word64)] -> Word64
 fatMaxFileLen es = S.findMax $ S.fromList $ map snd es
@@ -142,6 +154,7 @@ data AllocEntry = AllocEntry { beginSect :: Word64
 allocate :: ClustSize32 -> Word64 -> Entry -> [AllocEntry]
 allocate cl from = eFix . eAlloc . eOrder . filter eFilt . universe
   where eFilt (File _ _ _ _) = True
+        eFilt (HiddenFile _ _ _ _) = True
         eFilt (Dir _ _ _)    = True
         eFilt (DirRoot _ _)  = True
         eFilt _            = False
@@ -174,6 +187,10 @@ writeEntry ct clust (DirDotDot q) =
 
 writeEntry ct clust (File _ nm sz _) =
   entryRecordShort nm sz clust ct []
+
+writeEntry ct clust (HiddenFile _ nm sz _) =
+  entryRecordShort nm sz clust ct [HIDDEN]
+
 
 entryRecordShort :: String -> Word64 -> Word64 -> Maybe CalendarTime -> [ATTR] -> BS.ByteString
 entryRecordShort nm size clust clk a = runPut $ do
@@ -226,6 +243,7 @@ generateData ct cl es = mergeRules $ execWriter $ do
       DirRoot _ es  -> writeEntries bsect esect es
       Dir _ _ es    -> writeEntries bsect esect es
       File _ _ _ bs -> tell [RANGE bsect esect (encodeBlock (BS.take (fromIntegral fatSectLen) bs) ++ [CALLBACK 0])]
+      HiddenFile _ _ _ bs -> tell [RANGE bsect esect (encodeBlock (BS.take (fromIntegral fatSectLen) bs) ++ [CALLBACK 0])]
   where
 
       root@(DirRoot i _) = (entry.fromJust)(find isRoot es)
@@ -239,6 +257,7 @@ generateData ct cl es = mergeRules $ execWriter $ do
       ent (AllocEntry{beginSect=bs, entry=(DirRoot eid _)})  = (eid, clustN bs)
       ent (AllocEntry{beginSect=bs, entry=(Dir eid _ _)})    = (eid, clustN bs)
       ent (AllocEntry{beginSect=bs, entry=(File eid _ _ _)}) = (eid, clustN bs)
+      ent (AllocEntry{beginSect=bs, entry=(HiddenFile eid _ _ _)}) = (eid, clustN bs)
       ent _ = error "assertion failed"
 
       clOf (DirRoot eid _) = getCl eid
@@ -247,6 +266,7 @@ generateData ct cl es = mergeRules $ execWriter $ do
       clOf (DirDotDot eid) | eid == rootId = 0
                            | otherwise = getCl eid
       clOf (File eid _ _ _) = getCl eid
+      clOf (HiddenFile eid _ _ _) = getCl eid
 
       getCl n = fromJust (M.lookup n clMap)
 

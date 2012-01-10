@@ -163,10 +163,14 @@ constructFile size (n, (ip, url, ext)) = do
         putWord8 0
   file name size $ const firstBytes
 
+fatSample10 = filesystem $ do
+  file "file1" (gigs 2) helloFile
+  hiddenFile "file2" (gigs 2) helloFile
+
 main = do
   let cl = CL_32K
   let rsvd  = 32
-  let sample = fatSample9
+  let sample = fatSample10
   let dSize = calcDataSize cl sample 
 
   newStdGen >>= setStdGen
