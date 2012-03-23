@@ -3,7 +3,7 @@ module FatGenAPI (Entry, EntryInfo(..), ClusterTable(..), FAT32GenInfo(..),
                   allocate, filesystem, dir, file, hiddenFile, emptyDir,
                   gigs, megs, compileRules, genFileAllocTableRaw,
                   genFileAllocTable, fatSize, calcVolSize, genFATRules,
-                  calcDataSize, emptyFile
+                  calcDataSize, emptyFile, sectorBlock
                  ) where
 
 import qualified Data.ByteString.Lazy as BS
@@ -38,7 +38,6 @@ import FAT
 import Encode
 import VMCode
 import EncodeVM (Block)
-import CWriter
 import Util
 
 data EntryInfo = EntryInfo { fileId :: Word64, fileName :: String, fileSize :: Word64 }
@@ -94,6 +93,9 @@ emptyFile = const (BS.replicate (fromIntegral fatSectLen) 0)
 
 emptyDir :: EntryIdM ()
 emptyDir = tell []
+
+sectorBlock :: Word64 -> BS.ByteString -> Rule
+sectorBlock s d = REQ s $ encodeBlock d
 
 isFile :: Entry -> Bool
 isFile (File _ _ _ _) = True

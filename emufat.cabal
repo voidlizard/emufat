@@ -1,5 +1,5 @@
 name:                emufat
-version:             0.9
+version:             0.9.1
 synopsis:            FAT emulation toolkit 
 description:         N/A
 category:            Codec
