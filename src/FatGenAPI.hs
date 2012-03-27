@@ -367,12 +367,13 @@ adjRules sect = map withRule
   where withRule (REQ n c) = REQ (n+sect) c
         withRule (RANGE a b c) = RANGE (a+sect) (b+sect) c
 
-data FAT32GenInfo = FAT32GenInfo { clusterSize  :: ClustSize32
-                                 , volSize      :: Word64
-                                 , volID        :: Word32
-                                 , volLabel     :: String
-                                 , fatSectors   :: Word64
-                                 , reservedSect :: Maybe Word64
+data FAT32GenInfo = FAT32GenInfo { clusterSize   :: ClustSize32
+                                 , volSize       :: Word64
+                                 , volID         :: Word32
+                                 , volLabel      :: String
+                                 , fatSectors    :: Word64
+                                 , fatFreeSize   :: Maybe Word64
+                                 , reservedSect  :: Maybe Word64
                                  } deriving (Show)
 
 fatGenBoot32 :: FAT32GenInfo -> BS.ByteString
@@ -412,7 +413,7 @@ fatGenBoot32 info = addRsvd $ runPut $ do
   putWord32le 0x41615252        --    LeadSig
   putBytes (replicate 480 0)    --    Reserved
   putWord32le 0x61417272        --    StructSig
-  putWord32le 0xFFFFFFFF        --    FreeCount
+  putWord32le freecl            --    FreeCount
   putWord32le 0xFFFFFFFF        --    NxtFree
   putBytes (replicate 12 0)     --    Reserved
   putWord32le 0xAA550000        --    TrailSign
@@ -425,9 +426,10 @@ fatGenBoot32 info = addRsvd $ runPut $ do
         spc = fromIntegral (fatSectPerClust cl)
         fsect = w32 $ fatSectors info
         label = volLabel info
-        rsvd' = maybe 32 id (reservedSect info)
+        rsvd' = fromMaybe 32 (reservedSect info)
         rsvd = fromIntegral rsvd' :: Word16
         fsName = take 8 $ BS.unpack $ runPut $ putNameASCII "FAT32"
+        freecl = w32 $ maybe 0xFFFFFFFF (\s -> fatClusters cl s - 1) (fatFreeSize info) -- fsck shows we need -1
         w32 = fromIntegral
         addRsvd bs  = runPut $ do
                        putLazyByteString bs
@@ -455,14 +457,14 @@ genFileAllocTableRaw cl dSize sample = genFAT cl fs alloc
    alloc = allocate cl 0 sample
 
 genFileAllocTable :: Word64 -> ClusterTable -> [Rule]
-genFileAllocTable off t = encodeFAT (off) t
+genFileAllocTable off t = encodeFAT off t
 
 genFATRules :: FAT32GenInfo -> ClusterTable -> CalendarTime -> Entry -> [Rule]
 genFATRules fatInfo fat1 ct sample = rules
   where
     rules = mergeRules $ concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
     fatBin  = fatGenBoot32 fatInfo
-    fat  = encodeFAT (fatStart) fat1
+    fat  = encodeFAT fatStart fat1
     fatStart = fromIntegral (BS.length fatBin) `div` fatSectLen
     f2sect = (fsect.last) fat
     fat2 = encodeFAT (f2sect + 1) fat1

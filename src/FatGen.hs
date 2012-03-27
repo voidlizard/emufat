@@ -180,7 +180,7 @@ main = do
   let fSize = fatSize cl dSize
   let fat1 = genFileAllocTableRaw cl dSize sample
   let volSize = calcVolSize rsvd cl dSize
-  let fatInfo = FAT32GenInfo cl volSize volId "TEST" (fatSectorsOf fSize) (Just rsvd)
+  let fatInfo = FAT32GenInfo cl volSize volId "TEST" (fatSectorsOf fSize) Nothing (Just rsvd)
   let rules = genFATRules fatInfo fat1 ct sample
   let vm = compileRules rules
 
