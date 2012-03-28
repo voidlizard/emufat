@@ -56,7 +56,7 @@ fsect (REQ n _) = n
 fsect (RANGE n _ _) = n
 
 encodeBlock :: BS.ByteString -> [Chunk]
-encodeBlock bs = eat [] [] groups
+encodeBlock bs = {-# SCC "encodeBlock" #-}eat [] [] groups
   where groups  = group (BS.unpack bs)
         eat :: [Chunk] -> [Word8] -> [[Word8]] -> [Chunk]
         eat acc seq (x:xs) | length x == 1 = eat acc (head x:seq) xs

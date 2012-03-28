@@ -320,17 +320,19 @@ encodeFAT from xs = runEncode (eat xs)
                                   bn = fromIntegral (BS.length a) `div` 4
                               in sector (runGet (replicateM bn getWord32le) a) >> eat b
 
-        runEncode f = mergeSeries $ evalState (execWriterT f) from
+        runEncode f = {-# SCC "runEncode" #-} mergeSeries $ evalState (execWriterT f) from
 
         sector chunk | null chunk = tell []
-                     | otherwise  = do
+                     | otherwise  = {-# SCC "sector" #-} do
           i <- lift get
           lift $ modify succ
-          tell [REQ i (normalize (encodeSeries chunk))]
+          let chunk1 = {-# SCC "chunk" #-} chunk
+              scc1 = {-# SCC "scc1" #-} (normalize (encodeSeries chunk1))
+          tell [REQ i scc1]
 
         ns = fatSectLen `div` 4
 
-        mergeSeries rules = execWriter (eat rules)
+        mergeSeries rules = {-# SCC "ms" #-} execWriter (eat rules)
           where
             mCnd1 n n' a b a' b' = n+1 == n' && (b+1) == a' && (b - a) == (b' - a')
             mCnd2 n n' bs off sp a b =
@@ -346,18 +348,21 @@ encodeFAT from xs = runEncode (eat xs)
             eat x = tell x
 
         normalize :: [Chunk] -> [Chunk]
-        normalize xs = normRLE normSer
-          where normSer = execWriter (mapM_ withSer xs)
-                withSer (SER a b) | (b - a) < 4 = genBSeq a b
-                withSer x = tell [x]
-                genBSeq a b = tell $ encodeBlock (runPut (mapM_ putWord32le [a .. b]))
-                normRLE xs = execWriter (eatRLE xs)
-                eatRLE (RLE n x : RLE n' x' : xs) | x == x' = eatRLE (RLE (n+n') x : xs)
-                eatRLE (x:y:xs) = tell [x] >> eatRLE (y:xs)
-                eatRLE x = tell x
+        normalize xs = {-# SCC "norm" #-} normRLE normSer
+          where normSer = {-# SCC "normSer" #-}execWriter (mapM_ withSer xs)
+                withSer (SER a b) | (b - a) < 4 = {-# SCC "withSer" #-}genBSeq a b
+                withSer x = {-# SCC "withSer" #-} tell [x]
+                genBSeq 0 0 = {-# SCC "genBSeq0" #-} tell freeBlock
+                genBSeq a b = {-# SCC "genBSeq" #-} tell $ encodeBlock (runPut (mapM_ putWord32le [a .. b]))
+                normRLE xs = {-# SCC "normRLE" #-} execWriter (eatRLE xs)
+                eatRLE (RLE n x : RLE n' x' : xs) | x == x' = {-# SCC "eatRLE" #-}eatRLE (RLE (n+n') x : xs)
+                eatRLE (x:y:xs) = {-# SCC "eatRLE" #-}tell [x] >> eatRLE (y:xs)
+                eatRLE x = {-# SCC "eatRLE" #-}tell x
+
+freeBlock = encodeBlock (runPut (putWord32le 0))
 
 encodeSeries :: [Word32] -> [Chunk]
-encodeSeries xs = (snd . runWriter) (eat series0)
+encodeSeries xs = {-# SCC "encodeSeries" #-} (snd . runWriter) (eat series0)
   where series0 = map (\x -> SER x x) xs
         eat (SER a b : SER a' b' : xs) | b+1 == a' = eat (SER a b' : xs)
         eat (x:y:xs) = tell [x] >> eat (y:xs)
@@ -462,14 +467,14 @@ genFileAllocTable off t = encodeFAT off t
 genFATRules :: FAT32GenInfo -> ClusterTable -> CalendarTime -> Entry -> [Rule]
 genFATRules fatInfo fat1 ct sample = rules
   where
-    rules = mergeRules $ concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
+    rules = {-# SCC "merge" #-} mergeRules $ concat [encodeRaw fatSectLen 0 fatBin, fat, fat2, gen2]
     fatBin  = fatGenBoot32 fatInfo
-    fat  = encodeFAT fatStart fat1
+    fat  = {-# SCC "f1" #-} encodeFAT fatStart fat1
     fatStart = fromIntegral (BS.length fatBin) `div` fatSectLen
     f2sect = (fsect.last) fat
-    fat2 = encodeFAT (f2sect + 1) fat1
+    fat2 = {-# SCC "f2" #-} encodeFAT (f2sect + 1) fat1
     datasect = (fsect.last) fat2
-    gen2 = generateData (Just ct) clust (allocate clust (datasect + 1) sample)
+    gen2 = {-# SCC "gen2" #-} generateData (Just ct) clust (allocate clust (datasect + 1) sample)
     clust = clusterSize fatInfo
 
 compileRules :: [Rule] -> [Block]
