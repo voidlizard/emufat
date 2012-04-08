@@ -44,17 +44,17 @@ import FatGenAPI
 helloFile = const $ BS8.pack "HELLO WORLD!!"
 
 fatSample2 = filesystem $ do
-  file "file0" (16384) helloFile 
+  file "file0" CB_STREAM (16384) helloFile 
   dir "A" $ do
-    file "file1" (megs 100) helloFile 
+    file "file1" CB_STREAM (megs 100) helloFile 
     dir "C" $ do
-      file "file3" (megs 100) helloFile 
-      file "file4" (megs 100) helloFile 
-      file "file5" (megs 100) helloFile 
+      file "file3" CB_STREAM (megs 100) helloFile 
+      file "file4" CB_STREAM (megs 100) helloFile 
+      file "file5" CB_STREAM (megs 100) helloFile 
       dir "E" $ emptyDir 
       
   dir "B" $ do
-    file "file2" (megs 50) emptyFile
+    file "file2" CB_STREAM (megs 50) emptyFile
 
 fatSample3 = filesystem $ do
   dir "A" $ do
@@ -64,58 +64,58 @@ fatSample3 = filesystem $ do
   dir "D" $ do emptyDir
 
 fatSample4 = filesystem $ do
-  file "file1" (megs 100) emptyFile
-  file "file2" (megs 100) emptyFile
-  file "file3" (megs 100) emptyFile
-  file "file4" (megs 100) emptyFile
-  file "file5" (megs 100) emptyFile
-  file "file6" (megs 100) emptyFile
-  file "file7" (megs 100) emptyFile
-  file "file8" (megs 100) emptyFile
-  file "file9" (megs 100) emptyFile
-  file "file10" (megs 100) emptyFile
-  file "file11" (megs 100) emptyFile
-  file "file12" (megs 100) emptyFile
-  file "file13" (megs 100) emptyFile
-  file "file14" (megs 100) emptyFile
-  file "file15" (megs 100) emptyFile
-  file "file16" (megs 100) emptyFile
-  file "file17" (megs 100) emptyFile
-  file "file18" (megs 100) emptyFile
-  file "file19" (megs 100) emptyFile
-  file "file20" (megs 100) emptyFile
+  file "file1" CB_STREAM (megs 100) emptyFile
+  file "file2" CB_STREAM (megs 100) emptyFile
+  file "file3" CB_STREAM (megs 100) emptyFile
+  file "file4" CB_STREAM (megs 100) emptyFile
+  file "file5" CB_STREAM (megs 100) emptyFile
+  file "file6" CB_STREAM (megs 100) emptyFile
+  file "file7" CB_STREAM (megs 100) emptyFile
+  file "file8" CB_STREAM (megs 100) emptyFile
+  file "file9" CB_STREAM (megs 100) emptyFile
+  file "file10" CB_STREAM (megs 100) emptyFile
+  file "file11" CB_STREAM (megs 100) emptyFile
+  file "file12" CB_STREAM (megs 100) emptyFile
+  file "file13" CB_STREAM (megs 100) emptyFile
+  file "file14" CB_STREAM (megs 100) emptyFile
+  file "file15" CB_STREAM (megs 100) emptyFile
+  file "file16" CB_STREAM (megs 100) emptyFile
+  file "file17" CB_STREAM (megs 100) emptyFile
+  file "file18" CB_STREAM (megs 100) emptyFile
+  file "file19" CB_STREAM (megs 100) emptyFile
+  file "file20" CB_STREAM (megs 100) emptyFile
 
 fatSample6 = filesystem $ do
-  file "file1" (gigs 1) emptyFile
-  file "file2" (gigs 1) emptyFile
-  file "file3" (gigs 1) emptyFile
-  file "file4" (gigs 1) emptyFile
-  file "file5" (gigs 1) emptyFile
-  file "file6" (gigs 1) emptyFile
-  file "file7" (gigs 1) emptyFile
-  file "file8" (gigs 1) emptyFile
-  file "file9" (gigs 1) emptyFile
+  file "file1" CB_STREAM (gigs 1) emptyFile
+  file "file2" CB_STREAM (gigs 1) emptyFile
+  file "file3" CB_STREAM (gigs 1) emptyFile
+  file "file4" CB_STREAM (gigs 1) emptyFile
+  file "file5" CB_STREAM (gigs 1) emptyFile
+  file "file6" CB_STREAM (gigs 1) emptyFile
+  file "file7" CB_STREAM (gigs 1) emptyFile
+  file "file8" CB_STREAM (gigs 1) emptyFile
+  file "file9" CB_STREAM (gigs 1) emptyFile
 
 fatSample5 = filesystem $ do
-  file "file1" (gigs 1) helloFile
-  file "file2" (gigs 1) helloFile
-  file "file3" (gigs 1) helloFile
-  file "file4" (gigs 1) helloFile
-  file "file5" (gigs 1) helloFile
-  file "file6" (gigs 1) helloFile
-  file "file7" (gigs 1) helloFile
-  file "file8" (gigs 1) helloFile
-  file "file9" (gigs 1) helloFile
-  file "file10" (gigs 1) helloFile
-  file "file11" (gigs 1) helloFile
-  file "file12" (gigs 1) helloFile
-  file "file13" (gigs 1) helloFile
-  file "file14" (gigs 1) helloFile
-  file "file15" (gigs 1) helloFile
-  file "file16" (gigs 1) helloFile
+  file "file1" CB_STREAM (gigs 1) helloFile
+  file "file2" CB_STREAM (gigs 1) helloFile
+  file "file3" CB_STREAM (gigs 1) helloFile
+  file "file4" CB_STREAM (gigs 1) helloFile
+  file "file5" CB_STREAM (gigs 1) helloFile
+  file "file6" CB_STREAM (gigs 1) helloFile
+  file "file7" CB_STREAM (gigs 1) helloFile
+  file "file8" CB_STREAM (gigs 1) helloFile
+  file "file9" CB_STREAM (gigs 1) helloFile
+  file "file10" CB_STREAM (gigs 1) helloFile
+  file "file11" CB_STREAM (gigs 1) helloFile
+  file "file12" CB_STREAM (gigs 1) helloFile
+  file "file13" CB_STREAM (gigs 1) helloFile
+  file "file14" CB_STREAM (gigs 1) helloFile
+  file "file15" CB_STREAM (gigs 1) helloFile
+  file "file16" CB_STREAM (gigs 1) helloFile
 
 fatSample7 = filesystem $ do
-  file "00.mp3" (gigs 2) $ const $ runPut $ do
+  file "00.mp3" CB_STREAM (gigs 2) $ const $ runPut $ do
     putWord32be 0xCAFEBABE
     putWord8 192
     putWord8 168
@@ -125,7 +125,7 @@ fatSample7 = filesystem $ do
     putLazyByteString "/jopakita/pechentreski.mp3"
     putWord8 0
  
-  file "01.mp3" (gigs 2) $ const $ runPut $ do
+  file "01.mp3" CB_STREAM (gigs 2) $ const $ runPut $ do
     putWord32be 0xCAFEBABE
     putWord8 192
     putWord8 168
@@ -137,7 +137,7 @@ fatSample7 = filesystem $ do
 
 
 fatSample8 = filesystem $ do
-  file "00.mp3" (gigs 2) $ const $ runPut $ do
+  file "00.mp3" CB_STREAM (gigs 2) $ const $ runPut $ do
     putWord32be 0xCAFEBABE
     putWord8 192
     putWord8 168
@@ -161,16 +161,12 @@ constructFile size (n, (ip, url, ext)) = do
         putWord32be ip
         putLazyByteString $ BS8.pack url
         putWord8 0
-  file name size $ const firstBytes
-
-fatSample10 = filesystem $ do
-  file "file1" (gigs 2) helloFile
-  hiddenFile "file2" (gigs 2) helloFile
+  file name CB_STREAM size $ const firstBytes
 
 main = do
   let cl = CL_32K
   let rsvd  = 32
-  let sample = fatSample10
+  let sample = fatSample9
   let dSize = calcDataSize cl sample 
 
   newStdGen >>= setStdGen

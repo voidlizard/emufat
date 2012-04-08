@@ -93,6 +93,3 @@ instance Enum ATTR where
   toEnum 0x08 = VOL_ID
   toEnum 0x10 = DIR
   toEnum 0x20 = ARCH
-
-
-
