@@ -42,7 +42,8 @@ int main(int argc, char **argv) {
     size_t read = 0;
     int n  = 0;
 
-    cb[1].fn = cb1;
+    // 0 for streams, 1 for normal files, 2 testing hello world
+    cb[2].fn = cb1;
 
     if( argc > 1 ) n = atoi(argv[1]);
 
