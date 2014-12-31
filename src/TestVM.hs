@@ -1,3 +1,31 @@
+-- Copyright (c) 2014, Dmitry Zuikov
+-- All rights reserved.
+
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+
+-- * Redistributions of source code must retain the above copyright notice, this
+--   list of conditions and the following disclaimer.
+
+-- * Redistributions in binary form must reproduce the above copyright notice,
+--   this list of conditions and the following disclaimer in the documentation
+--   and/or other materials provided with the distribution.
+
+-- * Neither the name of emufat nor the names of its
+--   contributors may be used to endorse or promote products derived from
+--   this software without specific prior written permission.
+
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+-- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-- SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-- OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 --{-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 module Main where
@@ -29,8 +57,8 @@ type TestSuiteM a = Writer [Test] a
 
 data DUMP = HEX | BIN
 
---makeTest f = trace (show norm) $ norm 
-makeTest f = norm 
+--makeTest f = trace (show norm) $ norm
+makeTest f = norm
   where
 --    norm  = trace (show code) $ normalize ml code
     norm  = normalize ml code
@@ -111,7 +139,7 @@ testJz1 = makeTest $ do
   l1 <- newLabel
   l2 <- newLabel
 
-  cnst 0 
+  cnst 0
   dup
   jz l1
   outle
@@ -165,7 +193,7 @@ testJgq = makeTest $ do
 
 testJne = makeTest $ do
   [l1, l2] <- replicateM 2 newLabel
-  
+
   cnst 1
   cnst 2
   jne l1
@@ -210,11 +238,11 @@ testNSer1 = makeTest $ do
   nser 0 0 128
 
 testNSer2 = makeTest $ do
-  cnst 3 
+  cnst 3
   nser 129 3 128
 
 testNSer128 = makeTest $ do
-  cnst 3 
+  cnst 3
   nser128 129 3
 
 testLoadsN = makeTest $ do
@@ -234,7 +262,7 @@ testCb0 = makeTest $ do
 
 testCb1 = makeTest $ do
   rle 32 0xFF
-  calln 1
+  calln 2
   exit
 
 helloworld = C8.pack "HELLO WORLD"
@@ -284,7 +312,7 @@ tests = testSuite $ do
   test "testNot"  testNot (assert $ do
                              a <- getWord32le
                              b <- getWord32le
-                             return $ a == 0 && b == 1 
+                             return $ a == 0 && b == 1
                           )
 
   test "testConst1" testConst1 (assert $ do
@@ -404,14 +432,14 @@ main = do
   case args of
     ("run"  : path : []) | (not.null) path   -> mapM_ (runTest path) tests
     ("run"  : path : testid : []) | (not.null) path  -> withTest testid (runTest path)
-    ("dump" : tid : _)     -> withTest tid (dumpTest BIN) 
+    ("dump" : tid : _)     -> withTest tid (dumpTest BIN)
     ("dump-hex" : tid : _) -> withTest tid (dumpTest HEX)
     ("ls" : _)             -> putStrLn "" >> mapM_ putStrLn (map tname tests)
     _       -> error "Usage: TestVM run vm-binary-path|dump test-id|dump-hex test-id|ls"
 
   putStrLn ""
 
-runTest :: String -> Test -> IO Bool 
+runTest :: String -> Test -> IO Bool
 runTest path (T{tname=nm, tcode=code, tcheck = tc})= do
   let bin = toBinary code
   (inp,out,err,pid) <- runInteractiveProcess path [] Nothing Nothing
@@ -425,14 +453,14 @@ runTest path (T{tname=nm, tcode=code, tcheck = tc})= do
 withTest :: String -> (Test -> IO Bool) -> IO ()
 withTest s f =
   case (find ((==s).tname) tests) of
-    Nothing -> error $ "*** no test found: " ++ s 
+    Nothing -> error $ "*** no test found: " ++ s
     Just t  -> f t >> return ()
 
 dumpTest BIN t = do
   BS.hPut stdout (toBinary (tcode t))
   hFlush stdout
   return True
- 
+
 dumpTest HEX t = do
   mapM_ putStrLn (hexDump 16 (toBinary (tcode t)))
   return True

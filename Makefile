@@ -1,24 +1,20 @@
 .DEFAULT: all
+.PHONY: config
+
 
 all:
-	cabal-dev build
-	rm -f ./FatGen
-	rm -f ./TestVM
-	ln -s dist/build/FatGen/FatGen
-	ln -s dist/build/TestVM/TestVM
+	cabal build
 	cd cbits && make all
 	cd cbits && make genfat 
 
 clean:
-	rm -f ./FatGen
-	rm -f ./TestVM
-	cabal-dev clean
+	cabal clean
 
 config:
+	cabal sandbox init
+	cabal install --dependencies-only
 	cabal configure
-	cabal-dev install-deps
-	cabal-dev configure
 
 test:
-	./TestVM run cbits/teststubs
+	dist/build/TestVM/TestVM run cbits/teststubs
 

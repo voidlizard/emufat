@@ -1,8 +1,36 @@
+-- Copyright (c) 2014, Dmitry Zuikov
+-- All rights reserved.
+
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+
+-- * Redistributions of source code must retain the above copyright notice, this
+--   list of conditions and the following disclaimer.
+
+-- * Redistributions in binary form must reproduce the above copyright notice,
+--   this list of conditions and the following disclaimer in the documentation
+--   and/or other materials provided with the distribution.
+
+-- * Neither the name of emufat nor the names of its
+--   contributors may be used to endorse or promote products derived from
+--   this software without specific prior written permission.
+
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+-- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-- SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-- OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 {-# LANGUAGE EmptyDataDecls, OverloadedStrings, DeriveDataTypeable, BangPatterns, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 module Main where
 
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString.Lazy.Char8 as BS8 
+import qualified Data.ByteString.Lazy.Char8 as BS8
 import System.Environment ( getArgs )
 import System.Time
 import Text.Printf
@@ -29,7 +57,7 @@ import Data.Typeable
 import Data.Generics.Uniplate.Data
 import Data.Binary.Put
 import Data.Binary.Get
-import Random
+import System.Random
 
 import FAT
 import Encode
@@ -44,23 +72,23 @@ import FatGenAPI
 helloFile = const $ BS8.pack "HELLO WORLD!!"
 
 fatSample2 = filesystem $ do
-  file "file0" CB_STREAM (16384) helloFile 
+  file "file0" CB_STREAM (16384) helloFile
   dir "A" $ do
-    file "file1" CB_STREAM (megs 100) helloFile 
+    file "file1" CB_STREAM (megs 100) helloFile
     dir "C" $ do
-      file "file3" CB_STREAM (megs 100) helloFile 
-      file "file4" CB_STREAM (megs 100) helloFile 
-      file "file5" CB_STREAM (megs 100) helloFile 
-      dir "E" $ emptyDir 
-      
+      file "file3" CB_STREAM (megs 100) helloFile
+      file "file4" CB_STREAM (megs 100) helloFile
+      file "file5" CB_STREAM (megs 100) helloFile
+      dir "E" $ emptyDir
+
   dir "B" $ do
     file "file2" CB_STREAM (megs 50) emptyFile
 
 fatSample3 = filesystem $ do
   dir "A" $ do
     dir "B" $ do
-      dir "C" $ emptyDir 
-      
+      dir "C" $ emptyDir
+
   dir "D" $ do emptyDir
 
 fatSample4 = filesystem $ do
@@ -124,7 +152,7 @@ fatSample7 = filesystem $ do
     putWord32be 3000
     putLazyByteString "/jopakita/pechentreski.mp3"
     putWord8 0
- 
+
   file "01.mp3" CB_STREAM (gigs 2) $ const $ runPut $ do
     putWord32be 0xCAFEBABE
     putWord8 192
@@ -151,7 +179,7 @@ urls :: [(Word32, String, String)]
 urls = [(12345, "http://webcast.emg.fm:55655/europaplus128.mp3", "mp3"),
         (12345, "http://94.25.53.133/nashe-128.m3u", "mp3")]
 
-fatSample9 = 
+fatSample9 =
     filesystem $ mapM_ (constructFile (gigs 2)) $ zip [1..] urls
 
 constructFile size (n, (ip, url, ext)) = do
@@ -167,10 +195,10 @@ main = do
   let cl = CL_32K
   let rsvd  = 32
   let sample = fatSample9
-  let dSize = calcDataSize cl sample 
+  let dSize = calcDataSize cl sample
 
   newStdGen >>= setStdGen
-  volId <- randomW32 
+  volId <- randomW32
   ct <- getClockTime >>= toCalendarTime
 
   let fSize = fatSize cl dSize
@@ -200,7 +228,7 @@ main = do
       putStrLn ops
 
     ("rules" : _) -> do
-      mapM_ print rules 
+      mapM_ print rules
 
     ("alloc" : _) -> do
       let alloc = allocate cl 0 sample
@@ -222,7 +250,7 @@ randomW32 :: IO Word32
 randomW32 = liftM fromIntegral (randomIO :: IO Int)
 
 hex32 :: Word32 -> String
-hex32 x = printf "%08X" (fromIntegral x :: Int) 
+hex32 x = printf "%08X" (fromIntegral x :: Int)
 
 fatSampleEmpty = filesystem $ do return ()
 
