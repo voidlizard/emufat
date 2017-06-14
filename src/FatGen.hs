@@ -194,7 +194,7 @@ constructFile size (n, (ip, url, ext)) = do
 main = do
   let cl = CL_32K
   let rsvd  = 32
-  let sample = fatSample9
+  let sample = fatSample2
   let dSize = calcDataSize cl sample
 
   newStdGen >>= setStdGen

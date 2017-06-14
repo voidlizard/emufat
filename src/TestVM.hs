@@ -40,7 +40,7 @@ import Data.List
 import Data.Word
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy.Char8 as C8
-import Data.Binary.Get
+import Data.Binary.Get hiding (label)
 
 import Debug.Trace
 import Text.Printf

@@ -87,7 +87,7 @@ entries _ = []
 
 newtype EntryIdT m a = EntryIdT {
     runF :: (WriterT [Entry] (StateT (Word64, Word64) m)) a
-} deriving (Monad, MonadWriter [Entry], MonadState (Word64, Word64))
+} deriving (Applicative, Functor, Monad, MonadWriter [Entry], MonadState (Word64, Word64))
 
 type EntryIdM = EntryIdT Identity
 

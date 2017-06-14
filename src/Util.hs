@@ -46,15 +46,16 @@ hexDump n s = map (intercalate " " . map hex) (eat [] bytes)
 
 slice :: Int -> [a] -> [[a]]
 slice n xs = execWriter (eat xs)
-  where eat s | length s <= n = tell [s] 
+  where eat s | length s <= n = tell [s]
               | otherwise = tell [take n s] >> eat (drop n s)
 
 sliceBS :: Int -> BS.ByteString -> [BS.ByteString]
 sliceBS n xs = (snd . runWriter) (eat xs)
-  where eat s | bl s <= n = tell [s] 
+  where eat s | bl s <= n = tell [s]
               | otherwise = tell [BS.take (bn n) s] >> eat (BS.drop (bn n) s)
         bl = fromIntegral . BS.length
         bn = fromIntegral
 
+putBytes :: [Word8] -> PutM ()
 putBytes = mapM_ putWord8
 

@@ -26,6 +26,8 @@ executable  FatGen
                          ,uniplate
 
     ghc-options:         -O2
+    default-extensions:
+        FlexibleContexts
 
 executable TestVM 
     main-is:             TestVM.hs
@@ -43,6 +45,8 @@ executable TestVM
                          ,process
 
     ghc-options:         -O2
+    default-extensions:
+        FlexibleContexts
 
 library
     hs-source-dirs:	     src
@@ -50,3 +54,6 @@ library
     other-modules:       Encode, VMCode, CWriter, Util
 
     ghc-options:         -O2
+
+    default-extensions:
+        FlexibleContexts

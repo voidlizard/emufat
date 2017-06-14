@@ -85,8 +85,8 @@ import qualified EncodeVM as V
 import Util (slice)
 
 newtype GenT m a = GenT {
-    runGT :: (WriterT [Cmd] (StateT (Int) m)) a 
-} deriving (Monad, MonadWriter [Cmd], MonadState (Int))
+    runGT :: (WriterT [Cmd] (StateT (Int) m)) a
+} deriving (Applicative, Functor, Monad, MonadWriter [Cmd], MonadState (Int))
 
 type GenM = GenT Identity
 
@@ -96,7 +96,7 @@ runGen f n = evalState ( execWriterT (runGT f) ) n
 runGen'' :: GenM a -> Int -> ([Cmd], Label)
 runGen'' f n = runState ( execWriterT (runGT f) ) n
 
-seqs :: [Rule] -> [BS.ByteString] 
+seqs :: [Rule] -> [BS.ByteString]
 seqs rs = execWriter $ mapM_ eatR rs
   where eat (SEQ bs) = tell [bs]
         eat _ = tell []
@@ -154,7 +154,7 @@ mkVMCode xs = normalize maxl code
       s <- newLabel
       code' <- runGen' (scanmC code) >>= withLabel
       ex <- newLabel
- 
+
       label s
       dup
       cnst n
@@ -166,7 +166,7 @@ mkVMCode xs = normalize maxl code
       s <- newLabel
       code' <- runGen' (scanmC code) >>= withLabel
       ex <- newLabel
- 
+
       label s
       dup
       crng a b
@@ -176,14 +176,14 @@ mkVMCode xs = normalize maxl code
 
     scanC :: Chunk -> GenM ()
 
-    scanC ( SEQ bs ) | BS.length bs == 1  = 
+    scanC ( SEQ bs ) | BS.length bs == 1  =
       rle 1 (head (BS.unpack bs))
 
     scanC ( SEQ bs )  = do
       case (M.lookup bs seqm) of
         Just (l, seq) -> op1 CALL (ADDR (ALabel l))
         Nothing       -> loadsn bs
- 
+
     scanC ( E.SER x y ) = ser x y
 
     scanC ( E.NSER b o st ) | st == 128 = do
@@ -218,7 +218,7 @@ not_ = op0 NOT
 debug = op0 DEBUG
 
 eq :: GenM ()
-eq  = op0 V.EQ 
+eq  = op0 V.EQ
 neq = op0 NEQ
 geq = op0 GQ
 gt  = op0 GT
@@ -275,11 +275,11 @@ rlen x = op1 RLEN (w8 x)
 loads' :: Int -> GenM ()
 loads' 1  = error "BAD OPCODE: loads1"
 loads' 2  = op0 LOADS2
-loads' 3  = op0 LOADS3 
-loads' 4  = op0 LOADS4 
-loads' 5  = op0 LOADS5 
-loads' 6  = op0 LOADS6 
-loads' 7  = op0 LOADS7 
+loads' 3  = op0 LOADS3
+loads' 4  = op0 LOADS4
+loads' 5  = op0 LOADS5
+loads' 6  = op0 LOADS6
+loads' 7  = op0 LOADS7
 loads' 8  = op0 LOADS8
 loads' 9  = op0 LOADS9
 loads' 10 = op0 LOADS10
@@ -315,14 +315,14 @@ byte x = tell [RawByte (fromIntegral x)]
 cnst :: Integral a => a -> GenM ()
 cnst x = tell [CmdConst (fromIntegral x)]
 
-op0 :: Opcode -> GenM () 
+op0 :: Opcode -> GenM ()
 op0 x = tell [Cmd0 x]
 
 op1 x a = tell [Cmd1 x a]
 op2 x a b = tell [Cmd2 x a b]
 op3 x a b c = tell [Cmd3 x a b c]
 
-addr :: Label -> Addr 
+addr :: Label -> Addr
 addr l = ALabel l
 
 addr' :: Label -> CmdArg
@@ -347,7 +347,7 @@ normalize :: Label -> [Cmd] -> [(Label, [Cmd])]
 normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
 --normalize xs = trace (intercalate "\n" (map show xs)) $ map optBlock (mergeBlocks (optJumps blocks))
 --normalize xs = blocks
-  where 
+  where
         blocks = flip evalState [(ml+1)..] $ execWriterT (eat1 (Nothing, []) xs)
 
         eat1 (Nothing, []) (CmdLabel n:xs)  = eat1 (Just n, []) xs
@@ -357,7 +357,7 @@ normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
 
         eat1 (Just n, bs)  (a@(CmdJmp _ _):xs)  =
           block (n, normBlock (a:bs)) >> eat1 (Nothing, []) xs
- 
+
         eat1 (Just n, bs)  (a@(CmdCondJmp _ _):CmdLabel n':xs) =
           block (n, normBlock ((CmdJmp JMP (ALabel n')) : a : bs)) >> eat1 (Just n', []) xs
 
@@ -381,7 +381,7 @@ normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
         normBlock cs = reverse cs
 
         optJumps bs = hd bs ++ optJumps' (split (tl bs))
-          where 
+          where
                 hd (h@(_, [CmdJmp _ _]):_) = [h]
                 hd _ = []
                 tl  (h@(_, [CmdJmp _ _]):xs) = xs
@@ -405,7 +405,7 @@ normalize ml xs = map optBlock (mergeBlocks (optJumps blocks))
 
 --        mergeBlocks bs = trace (show jmap) $ map block (filter (not . (flip M.member jmap . fst)) bs)
         mergeBlocks bs = map block (filter (not . (flip M.member jmap . fst)) bs)
-          where 
+          where
             jmap = M.filter (==1) $ flip execState M.empty $ mapM_ jmp (concat (map snd bs))
 --            jmap = flip execState M.empty $ mapM_ jmp (concat (map snd bs))
             jmp (CmdJmp _ (ALabel n)) = lookSt n >>= inc n
